@@ -16,6 +16,11 @@ public class Explorer : MonoBehaviour {
 
 		Vector3 dir = Vector3.zero;
 
+		speed = 5f;
+
+		if (Input.GetKey(KeyCode.LeftShift)) {
+			speed = 0.5f;
+		}
 		if (Input.GetKey(KeyCode.Space)) {
 			dir += Vector3.up;
 		}

@@ -57,7 +57,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _BumpScale: 1
-    - _ContactThreshold: 0.001
+    - _ContactThreshold: 0.00001
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
@@ -70,6 +70,7 @@ Material:
     - _Mode: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.02
+    - _SDScene: 0
     - _Size: 1
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -79,4 +80,4 @@ Material:
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _Position: {r: -1.5314445, g: -0.014433637, b: 7.5626793, a: 3.665653}
+    - _Position: {r: -4.602159, g: -0.03147748, b: 6.429041, a: 17.021402}
