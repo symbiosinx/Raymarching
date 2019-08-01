@@ -1,10 +1,11 @@
 ﻿Shader "Custom/Raymarching" {
     Properties {
 		_Position("Camera Position", Vector) = (0, 1, 0, 0)
+		_Size("Size", Range(.1, 20)) = 1
 		_MaxSteps("Max Steps", Range(0, 2000)) = 100
 		_MaxDist("Max Distance", Range(0, 2000)) = 100
 		_ContactThreshold("Contact Threshold", Range(0.00001, 0.1)) = 0.01
-		_Size("Size", Range(.1, 20)) = 1
+		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.1)) = 0.01
     }
     SubShader {
         Cull Off ZWrite On ZTest LEqual
@@ -34,16 +35,26 @@
             }
 
 			float4 _Position;
+			float _Size;
 			float _MaxSteps;
 			float _MaxDist;
 			float _ContactThreshold;
-			float _Size;
+			float _NormalSampleScale;
 
 			struct ray {
 				bool hit;
 				float steps;
 				float length;
 			};
+
+			float3 rotate(float3 v, float3 a) {
+				float3 c = cos(a);
+				float3 s = sin(a);
+				float3x3 mx = float3x3(1, 0, 0, 0, c.x, -s.x, 0, s.x, c.x);
+				float3x3 my = float3x3(c.y, 0, s.y, 0, 1, 0, -s.y, 0, c.y);
+				float3x3 mz = float3x3(c.z, -s.z, 0, s.z, c.z, 0, 0, 0, 1);
+				return mul(mz, mul(my, mul(mx, v)));
+			}
 
 			float mod(float x, float m) {
 				float r = fmod(x, m);
@@ -70,8 +81,7 @@
 				return length(p) - r;
 			}
 
-			float sdtorus(float3 cpos, float3 pos, float2 t) {
-				float3 p = cpos - pos;
+			float sdtorus(float3 p, float2 t) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
 				return length(q) - t.y;
 			}
@@ -142,7 +152,7 @@
 			}
 
 			float sdmenger(float3 p){//this is our old friend menger
-				int n,iters=20;float t;
+				int n,iters=12;float t;
 				float x = p.x, y = p.y, z = p.z;
 				for(n=0;n<iters;n++){
 					x=abs(x);y=abs(y);z=abs(z);//fabs is just abs for floats
@@ -163,33 +173,38 @@
 				//float3 cpos = _Position.xyz;
 				//float3 p1 = shmod(p, (float3)(5));
 				//return sdmandelbulb(p-float3(0, 0, 5), 7).x;
-				float2 r1 = float2(cos(1.2), sin(1.2));
-				float2 r2 = float2(cos(2), sin(2));
-				float2 r3 = float2(cos(.5), sin(.5));
-				float3x3 m1 = { r1.x, 0, r1.y,
-							   0, 1, 0,
-							   r1.y, 0, r1.x };
-				float3x3 m2 = { 1, 0, 0, 
-								0, r2.x, -r2.y,
-								0, r2.y, r2.x };
-				float3x3 m3 = { r3.x, -r3.y, 0, 
-								r3.y, r3.x, 0,
-								0, 0, 1 };
-				float3 p1 = shmod(mul(m1, p+float3(1, 1, 1)), float3(4, 4, 4));
-				float3 p2 = shmod(mul(m2, p), float3(4, 4, 4));
-				float3 p3 = shmod(mul(m3, p+float3(-1, -1, -2)), float3(5, 4, 3));
-				return smin(smin(sdsierpinski(p1), sdmenger(p2), 1), sdmandelbulb(p3, sin(_Time.y)+6));
+				//float2 r1 = float2(cos(1.2), sin(1.2));
+				//float3x3 m1 = { r1.x, 0, r1.y,
+				//			   0, 1, 0,
+				//			   r1.y, 0, r1.x };
+				//float2 r2 = float2(cos(2), sin(2));
+				//float3x3 m2 = { 1, 0, 0, 
+				//				0, r2.x, -r2.y,
+				//				0, r2.y, r2.x };
+				//float2 r3 = float2(cos(.5), sin(.5));
+				//float3x3 m3 = { r3.x, -r3.y, 0, 
+				//				r3.y, r3.x, 0,
+				//				0, 0, 1 };
+				//float3 p1 = shmod(mul(m1, p+float3(1, 1, 1)), float3(4, 4, 4));
+				//float3 p2 = shmod(mul(m2, p), float3(4, 4, 4));
+				//float3 p3 = shmod(mul(m3, p+float3(-1, -1, -2)), float3(5, 4, 3));
+				//return smin(smin(sdsierpinski(p1), sdmenger(p2), 1), sdmandelbulb(p3, 8));
 				//return sdmenger(p.x, p.y, p.z);
+				//p = float3(p.x * cos(p.y * .0) - p.z * sin(p.y * .0), p.y, p.x * sin(p.y * .0) + p.z * cos(p.y * .0));
+				//p = float3(p.y * cos(p.x * .0) - p.z * sin(p.x * .0), p.x, p.y * sin(p.x * .0) + p.z * cos(p.x * .0));
+				p = rotate(p, float3(sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y), sin(p.y*.5+_Time.y)));
+				return sdmandelbulb(p, 9);
+
 			}
 
 			ray raymarch(float3 ro, float3 rd) {
 				float dm = 0;
 				bool hit;
 				for (int i = 0; i < _MaxSteps; i++) {
-					float3 cp = ro + rd * dm;
+					float3 cp = ro + rd * dm	;
 					float dts = sdscene(cp);
 					dm += dts;
-					if (dts < _ContactThreshold) {
+					if (abs(dts) < _ContactThreshold) {
 						hit = true;
 						break;
 					}
@@ -206,7 +221,7 @@
 
 			float3 getnormal(float3 pos) {
 				float d = sdscene(pos);
-				float2 e = float2(.00001, 0);
+				float2 e = float2(_NormalSampleScale, 0);
 				float3 n = d - float3(
 					sdscene(pos - e.xyy),
 					sdscene(pos - e.yxy),
@@ -232,17 +247,18 @@
 				fixed4 col;
 				col.a = 1;
 
-				float3 view = float3((-i.uv+.5)*_Size, 1);
+				float3 view = float3((-i.uv+.5), 1/_Size);
 				view = float3(view.x * cos(_Position.w) - view.z * sin(_Position.w), view.y, view.x * sin(_Position.w) + view.z * cos(_Position.w));
 
 				float3 ro = _Position;
 				float3 rd = normalize(view);
 				
 				ray r = raymarch(ro, rd);
-				float steps = r.steps;
 
 				//col = 1-r.steps/100;
-				col.rgb = r.hit ? (getnormal(ro + rd * r.length)*.5+.5) + (r.steps/200) : float3(0, 0, 0);
+				
+				float3 normal = getnormal(ro + rd * r.length)*.5+.5;
+				col.rgb = r.hit ? normal * (1 - r.steps / 100) : float3(0, 0, 0);
 				//col.rgb = r.hit ? dot(getnormal(ro + rd * r.length), float3(0, 1, 0)+.5): 0;
 
 				//float dist = r.length;
