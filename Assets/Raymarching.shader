@@ -191,8 +191,8 @@
 				//return smin(smin(sdsierpinski(p1), sdmenger(p2), 1), sdmandelbulb(p3, 8));
 				//return sdmenger(p.x, p.y, p.z);
 				//p = float3(p.x * cos(p.y * .0) - p.z * sin(p.y * .0), p.y, p.x * sin(p.y * .0) + p.z * cos(p.y * .0));
-				//p = float3(p.y * cos(p.x * .0) - p.z * sin(p.x * .0), p.x, p.y * sin(p.x * .0) + p.z * cos(p.x * .0));
-				p = rotate(p, float3(sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y), sin(p.y*.5+_Time.y)));
+				//p = float3(p.y * cos(p.x * .0) - p.z * sin(p.x * .0), p.x, p.y * sin(p.x * .0) 1+ p.z * cos(p.x * .0));
+				//p = rotate(p, float3(sin(p.y*.5+_Time.y), sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y)));
 				return sdmandelbulb(p, 9);
 
 			}
@@ -219,15 +219,34 @@
 				return r;
 			}
 
-			float3 getnormal(float3 pos) {
-				float d = sdscene(pos);
+			float3 getnormal(float3 p) {
 				float2 e = float2(_NormalSampleScale, 0);
-				float3 n = d - float3(
-					sdscene(pos - e.xyy),
-					sdscene(pos - e.yxy),
-					sdscene(pos - e.yyx));
-				//if (length(n) == 0) { return n; }
-				return normalize(n);
+
+				// Algorithm 1
+				
+				//return normalize(float3(
+				//	sdscene(p + e.xyy),
+				//	sdscene(p + e.yxy),
+				//	sdscene(p + e.yyx)
+				//) - sdscene(p));
+				
+				// Algorithm 2
+
+				//return normalize(float3(
+				//	sdscene(p+e.xyy) - sdscene(p-e.xyy),
+				//	sdscene(p+e.yxy) - sdscene(p-e.yxy),
+				//	sdscene(p+e.yyx) - sdscene(p-e.yyx)
+				//));
+
+				// Algorithm 3
+				
+				float2 k = float2(-1., 1.);
+				return normalize(
+					k.xyy*sdscene(p+k.xyy*e.x) +
+					k.yyx*sdscene(p+k.yyx*e.x) +
+					k.yxy*sdscene(p+k.yxy*e.x) +
+					k.xxx*sdscene(p+k.xxx*e.x)
+				);
 			}
 
 			float getlight(float3 pos) {
@@ -258,7 +277,7 @@
 				//col = 1-r.steps/100;
 				
 				float3 normal = getnormal(ro + rd * r.length)*.5+.5;
-				col.rgb = r.hit ? normal * (1 - r.steps / 100) : float3(0, 0, 0);
+				col.rgb = r.hit ? normal : float3(1, 1, 1);
 				//col.rgb = r.hit ? dot(getnormal(ro + rd * r.length), float3(0, 1, 0)+.5): 0;
 
 				//float dist = r.length;
