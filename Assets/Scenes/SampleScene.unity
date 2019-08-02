@@ -268,7 +268,7 @@ Transform:
   m_GameObject: {fileID: 176143065}
   m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: -0.7071068}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.777778, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 2
@@ -384,7 +384,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 561ab75e3c1473a4dbf4284bd67b4190, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  plane: {fileID: 176143069}
   mat: {fileID: 2100000, guid: a0e9b316ff5bbe446b8428530e488a90, type: 2}
+  aspectRatio: 1.7777778
 --- !u!4 &1369993679
 Transform:
   m_ObjectHideFlags: 0

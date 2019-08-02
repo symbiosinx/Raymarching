@@ -1,7 +1,10 @@
 ﻿Shader "Custom/Raymarching" {
     Properties {
-		_Position("Camera Position", Vector) = (0, 1, 0, 0)
-		_Size("Size", Range(.1, 20)) = 1
+		_AspectRatio("Aspect Ratio", Float) = 1.777778
+		_FieldOfView("Field of View", Range(.1, 20)) = 1
+		_Position("Camera Position", Vector) = (0, 1, -3, 0)
+		_Rotation("Camera Rotation", Vector) = (0, 0, 0, 0)
+		_LightPosition("Light Position", Vector) = (0, 10, 0, 0)
 		_MaxSteps("Max Steps", Range(0, 2000)) = 100
 		_MaxDist("Max Distance", Range(0, 2000)) = 100
 		_ContactThreshold("Contact Threshold", Range(0.00001, 0.1)) = 0.01
@@ -34,8 +37,11 @@
                 return o;
             }
 
-			float4 _Position;
-			float _Size;
+			float _AspectRatio;
+			float _FieldOfView;
+			float3 _Position;
+			float2 _Rotation;
+			float3 _LightPosition;
 			float _MaxSteps;
 			float _MaxDist;
 			float _ContactThreshold;
@@ -56,6 +62,10 @@
 				return mul(mz, mul(my, mul(mx, v)));
 			}
 
+			float remap(float x, float o1, float o2, float n1, float n2) {
+				return (x - o1) / (o2 - o1) * (n2 - n1) + n1;
+			}
+
 			float mod(float x, float m) {
 				float r = fmod(x, m);
 				float o = r < 0 ? r + m : r;
@@ -67,21 +77,26 @@
 				return o;
 			}
 			float shmod(float x, float m) {
-				return mod(x, m) - m * .5;
+				return mod(x + m * .5, m) - m * .5;
 			}
 			float3 shmod(float3 x, float3 m) {
-				return mod(x, m) - m * .5;
+				return mod(x + m * .5, m) - m * .5;
 			}
 
-			float smin(float a, float b, float k = 1) {
+			float smin(float a, float b, float k = .5) {
 				float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return lerp(b, a, h) - k * h * (1.0 - h);
 			}
 
-			float sdsphere(float3 p, float r=1.0) {
-				return length(p) - r;
+			float smax(float a, float b, float k = .5) {
+				// Temporary code
+				return -smin(-a, -b, k);
 			}
 
-			float sdtorus(float3 p, float2 t) {
+			float sdsphere(float3 p, float r=1.) {
+				return length(p) - r*.5;
+			}
+
+			float sdtorus(float3 p, float2 t=float2(1, .5)) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
 				return length(q) - t.y;
 			}
@@ -193,7 +208,9 @@
 				//p = float3(p.x * cos(p.y * .0) - p.z * sin(p.y * .0), p.y, p.x * sin(p.y * .0) + p.z * cos(p.y * .0));
 				//p = float3(p.y * cos(p.x * .0) - p.z * sin(p.x * .0), p.x, p.y * sin(p.x * .0) 1+ p.z * cos(p.x * .0));
 				//p = rotate(p, float3(sin(p.y*.5+_Time.y), sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y)));
-				return sdmandelbulb(p, 9);
+				//float3 p1 = rotate(shmod(p, 5), float3(0, _Time.y, 0));
+				//return sdmandelbulb(p1, 9);
+				return min(abs(rotate(p, float3(0, 0, 0)).y), smin(sdmandelbulb(rotate(p-float3(0, 2, 0), float3(UNITY_PI*.5, 0, 0)), 8), sdsphere(p-float3(1, 3, 0), 2)));
 
 			}
 
@@ -204,7 +221,7 @@
 					float3 cp = ro + rd * dm	;
 					float dts = sdscene(cp);
 					dm += dts;
-					if (abs(dts) < _ContactThreshold) {
+					if (dts < _ContactThreshold) {
 						hit = true;
 						break;
 					}
@@ -232,33 +249,38 @@
 				
 				// Algorithm 2
 
-				//return normalize(float3(
-				//	sdscene(p+e.xyy) - sdscene(p-e.xyy),
-				//	sdscene(p+e.yxy) - sdscene(p-e.yxy),
-				//	sdscene(p+e.yyx) - sdscene(p-e.yyx)
-				//));
+				return normalize(float3(
+					sdscene(p+e.xyy) - sdscene(p-e.xyy),
+					sdscene(p+e.yxy) - sdscene(p-e.yxy),
+					sdscene(p+e.yyx) - sdscene(p-e.yyx)
+				));
 
 				// Algorithm 3
 				
-				float2 k = float2(-1., 1.);
-				return normalize(
-					k.xyy*sdscene(p+k.xyy*e.x) +
-					k.yyx*sdscene(p+k.yyx*e.x) +
-					k.yxy*sdscene(p+k.yxy*e.x) +
-					k.xxx*sdscene(p+k.xxx*e.x)
-				);
+				//float2 k = float2(-1., 1.);
+				//return normalize(
+				//	k.xyy*sdscene(p+k.xyy*e.x) +
+				//	k.yyx*sdscene(p+k.yyx*e.x) +
+				//	k.yxy*sdscene(p+k.yxy*e.x) +
+				//	k.xxx*sdscene(p+k.xxx*e.x)
+				//);
 			}
 
-			float getlight(float3 pos) {
-				float3 lpos = /*_WorldSpaceLightPos0*/ float3(0, 5, 0);
-				float3 n = getnormal(pos);
-				float3 l = normalize(lpos - pos);
+			float getlight(float3 p) {
+				float3 n = getnormal(p);
+				float3 l = normalize(_LightPosition - p);
 				float dif = clamp(dot(n, l), 0, 1);
-				float d = raymarch(pos + n * _ContactThreshold * 2, l).length;
-				if (d < length(lpos - pos)) {
-					dif *= 0.1;
-				}
 				return dif;
+			}
+
+			float getshadow(float3 p) {
+				float3 n = getnormal(p);
+				float3 l = normalize(_LightPosition - p);
+				float d = raymarch(p + n * _ContactThreshold * 2, l).length;
+				if (d < length(_LightPosition - p)) {
+					return 0;
+				}
+				return 1;
 			}
 
 			fixed4 frag(v2f i) : SV_Target{
@@ -266,19 +288,49 @@
 				fixed4 col;
 				col.a = 1;
 
-				float3 view = float3((-i.uv+.5), 1/_Size);
-				view = float3(view.x * cos(_Position.w) - view.z * sin(_Position.w), view.y, view.x * sin(_Position.w) + view.z * cos(_Position.w));
+				float3 view = float3(-i.uv.x*_AspectRatio+_AspectRatio*.5, -i.uv.y+.5, 1./_FieldOfView);
+				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
+
+
+				float3 forward = rotate(float3(0., 0., 1 / _FieldOfView), float3(_Rotation.yx, 0.));
 
 				float3 ro = _Position;
 				float3 rd = normalize(view);
 				
 				ray r = raymarch(ro, rd);
-
-				//col = 1-r.steps/100;
 				
-				float3 normal = getnormal(ro + rd * r.length)*.5+.5;
-				col.rgb = r.hit ? normal : float3(1, 1, 1);
-				//col.rgb = r.hit ? dot(getnormal(ro + rd * r.length), float3(0, 1, 0)+.5): 0;
+				float3 hitpoint = ro + rd * r.length;
+				float3 normal = getnormal(hitpoint);
+
+				float3 light = normalize(_LightPosition - hitpoint);
+
+				if (r.hit) {
+					if (abs(hitpoint.y) < _ContactThreshold) {
+						if (mod(hitpoint.x, 2) < 1 ^ mod(hitpoint.z, 2) < 1) {
+							col.rgb = .2;
+						} else {
+							col.rgb = 1;
+						}
+					}
+					else {
+						if (dot(normal, -view) < .3) {
+							col.rgb = 0;
+						} else {
+							col.rgb = dot(normal, light) > 0 ? .8 : .5;
+							float3 ref = reflect(light, normal);
+							float spec = smoothstep(pow(max(dot(view, ref), 0), 16), .1, 0);
+							col += spec;
+						}
+
+						
+					}
+					col.rgb *= remap(getshadow(hitpoint), 0, 1, .5, 1);
+					//col.rgb *= (1 - r.steps / 100);
+				} else {
+					col.rgb = 0;
+				}
+
+
 
 				//float dist = r.length;
 				//float3 p = ro + rd * dist;
