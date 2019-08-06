@@ -8,7 +8,8 @@
 		_MaxSteps("Max Steps", Range(0, 2000)) = 100
 		_MaxDist("Max Distance", Range(0, 2000)) = 100
 		_ContactThreshold("Contact Threshold", Range(0.00001, 0.1)) = 0.01
-		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.1)) = 0.01
+		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.01)) = 0.01
+		_BentNormalSampleScale("Bent Normal Sample Scale", Range(0.0001, 0.1)) = 0.1
     }
     SubShader {
         Cull Off ZWrite On ZTest LEqual
@@ -46,12 +47,31 @@
 			float _MaxDist;
 			float _ContactThreshold;
 			float _NormalSampleScale;
+			float _BentNormalSampleScale;
 
 			struct ray {
 				bool hit;
 				float steps;
 				float length;
+				float3 origin;
+				float3 direction;
 			};
+
+			struct light {
+				float range;
+				float intensity;
+				float3 position;
+				float3 color;
+			};
+
+			float4 qmul(float4 v, float4 q) {
+				return float4(
+					v.x*q.x - v.y*q.y - v.z*q.z - v.w * q.w,
+					v.x*q.y + v.y*q.x - v.z*q.w + v.w * q.z,
+					v.x*q.z + v.y*q.w + v.z*q.x - v.w * q.y,
+					v.x*q.w - v.y*q.z + v.z*q.y + v.w * q.x
+				);
+			}
 
 			float3 rotate(float3 v, float3 a) {
 				float3 c = cos(a);
@@ -60,6 +80,20 @@
 				float3x3 my = float3x3(c.y, 0, s.y, 0, 1, 0, -s.y, 0, c.y);
 				float3x3 mz = float3x3(c.z, -s.z, 0, s.z, c.z, 0, 0, 0, 1);
 				return mul(mz, mul(my, mul(mx, v)));
+
+				//float cy = cos(a.x * 0.5);
+				//float sy = sin(a.x * 0.5);
+				//float cp = cos(a.y * 0.5);
+				//float sp = sin(a.y * 0.5);
+				//float cr = cos(a.z * 0.5);
+				//float sr = sin(a.z * 0.5);
+				//float4 q = float4(
+				//	cy * cp * cr + sy * sp * sr,
+				//	cy * cp * sr - sy * sp * cr,
+				//	sy * cp * sr + cy * sp * cr,
+				//	sy * cp * cr - cy * sp * sr
+				//);
+				//return qmul(qmul(float4(v, 0), q), float4(q.x, -q.y, -q.z, -q.w)).xyz;
 			}
 
 			float remap(float x, float o1, float o2, float n1, float n2) {
@@ -233,30 +267,32 @@
 				r.hit = hit;
 				r.steps = i;
 				r.length = dm;
+				r.origin = ro;
+				r.direction = rd;
 				return r;
 			}
 
-			float3 getnormal(float3 p) {
-				float2 e = float2(_NormalSampleScale, 0);
+			float3 getnormalraw(float3 p, float s = 0.) {
+				float2 e = float2(max(s, _NormalSampleScale), 0);
 
 				// Algorithm 1
-				
+
 				//return normalize(float3(
 				//	sdscene(p + e.xyy),
 				//	sdscene(p + e.yxy),
 				//	sdscene(p + e.yyx)
 				//) - sdscene(p));
-				
+
 				// Algorithm 2
 
-				return normalize(float3(
-					sdscene(p+e.xyy) - sdscene(p-e.xyy),
-					sdscene(p+e.yxy) - sdscene(p-e.yxy),
-					sdscene(p+e.yyx) - sdscene(p-e.yyx)
-				));
+				return (float3(
+					sdscene(p + e.xyy) - sdscene(p - e.xyy),
+					sdscene(p + e.yxy) - sdscene(p - e.yxy),
+					sdscene(p + e.yyx) - sdscene(p - e.yyx)
+					));
 
 				// Algorithm 3
-				
+
 				//float2 k = float2(-1., 1.);
 				//return normalize(
 				//	k.xyy*sdscene(p+k.xyy*e.x) +
@@ -266,15 +302,31 @@
 				//);
 			}
 
-			float getlight(float3 p) {
-				float3 n = getnormal(p);
-				float3 l = normalize(_LightPosition - p);
-				float dif = clamp(dot(n, l), 0, 1);
-				return dif;
+			float3 getnormal(float3 p, float s=0.) {
+				return normalize(getnormalraw(p, s));
 			}
 
-			float getshadow(float3 p) {
-				float3 n = getnormal(p);
+
+			float getlighthard(float3 p, float3 n, light l) {
+				float dist = length(p - l.position);
+				if (dist >= l.range) {
+					return 0.0;
+				}
+				return lerp(clamp(dot(n, l.position-p), 0, 1) * l.intensity, 0.0, dist/l.range);
+			}
+
+			float getlight(float3 p, float3 n, light l) {
+				// FIX UP
+				float dist = length(p - l.position);
+				if (dist >= l.range) {
+					return 0.0;
+				}
+				float d = dot(n, l.position - p) * .5 + .5;
+				d *= d;
+				return lerp(d * l.intensity, 0.0, dist / l.range);
+			}
+
+			float getshadow(float3 p, float3 n) {
 				float3 l = normalize(_LightPosition - p);
 				float d = raymarch(p + n * _ContactThreshold * 2, l).length;
 				if (d < length(_LightPosition - p)) {
@@ -283,7 +335,30 @@
 				return 1;
 			}
 
+			float getAO(float3 n) {
+				return length(n/_NormalSampleScale);
+			}
+
+			float getscatter(ray r, light l) {
+				// light to ray origin
+				float3 q = r.origin - l.position;
+
+				// coefficients
+				float b = dot(r.direction, q);
+				float c = dot(q, q);
+
+				// evaluate integral
+				float s = l.intensity / sqrt(c - b * b);
+				return s * (atan((r.length + b) * s) - atan(b * s));
+			}
+
 			fixed4 frag(v2f i) : SV_Target{
+
+				light l;
+				l.range = 10;
+				l.intensity = 1;
+				l.position = _LightPosition;
+				l.color = float3(.5, 1, 1);
 
 				fixed4 col;
 				col.a = 1;
@@ -300,36 +375,39 @@
 				ray r = raymarch(ro, rd);
 				
 				float3 hitpoint = ro + rd * r.length;
-				float3 normal = getnormal(hitpoint);
+				float3 rawnormal = getnormalraw(hitpoint);
+				float3 normal = normalize(rawnormal);
 
 				float3 light = normalize(_LightPosition - hitpoint);
 
-				if (r.hit) {
-					if (abs(hitpoint.y) < _ContactThreshold) {
-						if (mod(hitpoint.x, 2) < 1 ^ mod(hitpoint.z, 2) < 1) {
-							col.rgb = .2;
-						} else {
-							col.rgb = 1;
-						}
-					}
-					else {
-						if (dot(normal, -view) < .3) {
-							col.rgb = 0;
-						} else {
-							col.rgb = dot(normal, light) > 0 ? .8 : .5;
-							float3 ref = reflect(light, normal);
-							float spec = smoothstep(pow(max(dot(view, ref), 0), 16), .1, 0);
-							col += spec;
-						}
+				//if (r.hit) {
+				//	if (abs(hitpoint.y) < _ContactThreshold) {
+				//		if (mod(hitpoint.x, 2) < 1 ^ mod(hitpoint.z, 2) < 1) {
+				//			col.rgb = .2;
+				//		} else {
+				//			col.rgb = 1;
+				//		}
+				//	}
+				//	else {
+				//		if (dot(normal, -view) < .3) {
+				//			col.rgb = 0;
+				//		} else {
+				//			col.rgb = dot(normal, light) > 0 ? .8 : .5;
+				//			float3 ref = reflect(light, normal);
+				//			float spec = smoothstep(pow(max(dot(view, ref), 0), 16), .1, 0);
+				//			col += spec;
+				//		}
+				//
+				//		
+				//	}
+				//	col.rgb *= remap(getshadow(hitpoint), 0, 1, .5, 1);
+				//	//col.rgb *= (1 - r.steps / 100);
+				//} else {
+				//	col.rgb = 0;
+				//}
 
-						
-					}
-					col.rgb *= remap(getshadow(hitpoint), 0, 1, .5, 1);
-					//col.rgb *= (1 - r.steps / 100);
-				} else {
-					col.rgb = 0;
-				}
 
+				col.rgb = (r.hit ? getAO(rawnormal) * 1 * getlighthard(hitpoint, normal, l) * getshadow(hitpoint, normal) : 0) + .025 * getscatter(r, l);
 
 
 				//float dist = r.length;

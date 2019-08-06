@@ -57,17 +57,18 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Floats:
     - _AspectRatio: 1.7777778
+    - _BentNormalSampleScale: 0.0001
     - _BumpScale: 1
-    - _ContactThreshold: 0.01
+    - _ContactThreshold: 0.005
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _FieldOfView: 1
+    - _FieldOfView: 1.5
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _MaxDist: 500
-    - _MaxSteps: 150
+    - _MaxDist: 200
+    - _MaxSteps: 200
     - _Metallic: 0
     - _Mode: 0
     - _NormalSampleScale: 0.00001
@@ -85,6 +86,6 @@ Material:
     - _CameraRotation: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _LightPosition: {r: 0, g: 10, b: 0, a: 0}
-    - _Position: {r: 0.6952366, g: 4.4191117, b: -4.2531433, a: 0}
-    - _Rotation: {r: -0.046167336, g: 0.32582176, b: 0, a: 0}
+    - _LightPosition: {r: -2.28, g: 3.93, b: -1.57, a: 0}
+    - _Position: {r: -3.3749547, g: 4.1151905, b: -0.7046338, a: 0}
+    - _Rotation: {r: -4.5602694, g: 0.39493313, b: 0, a: 0}
