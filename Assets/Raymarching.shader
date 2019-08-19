@@ -9,7 +9,7 @@
 		_MaxDist("Max Distance", Range(0, 2000)) = 100
 		_ContactThreshold("Contact Threshold", Range(0.00001, 0.1)) = 0.01
 		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.01)) = 0.01
-		_BentNormalSampleScale("Bent Normal Sample Scale", Range(0.0001, 0.1)) = 0.1
+		_Skybox("Skybox", Cube) = "black" {}
     }
     SubShader {
         Cull Off ZWrite On ZTest LEqual
@@ -47,7 +47,7 @@
 			float _MaxDist;
 			float _ContactThreshold;
 			float _NormalSampleScale;
-			float _BentNormalSampleScale;
+			samplerCUBE _Skybox;
 
 			struct ray {
 				bool hit;
@@ -124,6 +124,32 @@
 			float smax(float a, float b, float k = .5) {
 				// Temporary code
 				return -smin(-a, -b, k);
+			}
+
+			float rand(float2 co){
+				return frac(sin(dot(co.xy, float2(12.9898,78.233))) * 43758.5453);
+			}
+
+			float noise(float2 st) {
+				float2 i = floor(st);
+				float2 f = frac(st);
+
+				// Four corners in 2D of a tile
+				float a = rand(i);
+				float b = rand(i + float2(1.0, 0.0));
+				float c = rand(i + float2(0.0, 1.0));
+				float d = rand(i + float2(1.0, 1.0));
+
+				// Smooth Interpolation
+
+				// Cubic Hermine Curve.  Same as SmoothStep()
+				float2 u = f*f*(3.0-2.0*f);
+				// u = smoothstep(0.,1.,f);
+
+				// Mix 4 coorners percentages
+				return lerp(a, b, u.x) +
+				(c - a)* u.y * (1.0 - u.x) +
+				(d - b) * u.x * u.y;
 			}
 
 			float sdsphere(float3 p, float r=1.) {
@@ -215,7 +241,8 @@
 			}
 
 			float sdscene(float3 p) {
-				//float s = smin(sdsphere(cpos, float3(1, 1, 5), 1), sdsphere(cpos, float3(-1, 1, 5), 1));
+				//p = length(p) < 5 ? shmod(p, float3(5, 5, 5)) : p;
+				//return smin(sdsphere(p-float3(-sin(_Time.y), 0, 0), 1), sdsphere(p - float3(sin(_Time.y), 0, 0), 1), 1);
 				//float t = sdtorus(cpos, float3(0, 0, 5), float2(2, .5));
 				//float p = cpos.y;
 				//return smin(p, t);
@@ -244,7 +271,9 @@
 				//p = rotate(p, float3(sin(p.y*.5+_Time.y), sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y)));
 				//float3 p1 = rotate(shmod(p, 5), float3(0, _Time.y, 0));
 				//return sdmandelbulb(p1, 9);
-				return min(abs(rotate(p, float3(0, 0, 0)).y), smin(sdmandelbulb(rotate(p-float3(0, 2, 0), float3(UNITY_PI*.5, 0, 0)), 8), sdsphere(p-float3(1, 3, 0), 2)));
+				//return min(abs(rotate(p, float3(0, 0, 0)).y), smin(sdmandelbulb(rotate(p-float3(0, 2, 0), float3(UNITY_PI*.5, 0, 0)), 8), sdsphere(p-float3(1, 3, 0), 2)));
+				//return smin(sdmandelbulb(rotate(rotate(p, float3(UNITY_PI*.5, 0, 0)), float3(sin(-p.z*.3+_Time.y*.5), sin(p.x*.3+_Time.y*.5), sin(p.y*.3+_Time.y*.5)))), 10, .8);
+				return noise(p.xz*.5) + noise(p.xz*1)*.5 + noise(p.xz*2)*.25 + noise(p.xz*4)*.125 + noise(p.xz*8)*.0625 + p.y;
 
 			}
 
@@ -321,7 +350,7 @@
 				if (dist >= l.range) {
 					return 0.0;
 				}
-				float d = dot(n, l.position - p) * .5 + .5;
+				float d = clamp(dot(n, l.position - p), -1, 1) * .5 + .5;
 				d *= d;
 				return lerp(d * l.intensity, 0.0, dist / l.range);
 			}
@@ -336,7 +365,7 @@
 			}
 
 			float getAO(float3 n) {
-				return length(n/_NormalSampleScale);
+				return clamp(length(n/_NormalSampleScale), 0, 1);
 			}
 
 			float getscatter(ray r, light l) {
@@ -406,10 +435,16 @@
 				//	col.rgb = 0;
 				//}
 
+				float3 sky = texCUBE(_Skybox, view);
 
-				col.rgb = (r.hit ? getAO(rawnormal) * 1 * getlighthard(hitpoint, normal, l) * getshadow(hitpoint, normal) : 0) + .025 * getscatter(r, l);
+				//col.rgb = (r.hit ? getAO(rawnormal) * 1 * getlight(hitpoint, normal, l) * getshadow(hitpoint, normal) : texCUBE(_Skybox, view)) + .025 * getscatter(r, l);
+				//col.rgb = ((normal * .5 + .5) * (clamp(getAO(rawnormal), 0, 1)) * (1-r.steps/100)) + .025 * getscatter(r, l);
 
+				//col.rgb = r.hit ? lerp((normal * .5 + .5), sky, 0) : sky;
 
+				col.rgb = r.hit ? lerp(float3(.5, .3, .2), float3(1, 1, 1), hitpoint.y + 1) : sky;
+
+				//col.rgb = sky;
 				//float dist = r.length;
 				//float3 p = ro + rd * dist;
 
