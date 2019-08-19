@@ -161,6 +161,11 @@
 				return length(q) - t.y;
 			}
 
+			float sdcylinder(float3 p, float h, float r) {
+			  float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
+			  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+			}
+
 
 			float2 sdmandelbulb(float3 p, float e=8, float iters=12, float bailout=10) {
 				float3 z = p;
@@ -240,6 +245,23 @@
 				return (sqrt(x*x+y*y+z*z)-1.5)*pow(3.0,-(float)iters);
 			}
 
+			float terrain(float2 x) {
+				float2 p = x*0.003/250.0;
+				float a = 0.0;
+				float b = 1.0;
+				float2 d = float2(0.0, 0.0);
+				for( int i=0; i<3; i++ )
+				{
+					float2 n = noise(p);
+					d += float2(n.y, 0.0);
+					a += b*n.x/(1.0+dot(d,d));
+					b *= 0.5;
+					p = float2(.8, -.6)*p*2.0;
+				}
+
+				return 250.0*120.0*a;
+			}
+
 			float sdscene(float3 p) {
 				//p = length(p) < 5 ? shmod(p, float3(5, 5, 5)) : p;
 				//return smin(sdsphere(p-float3(-sin(_Time.y), 0, 0), 1), sdsphere(p - float3(sin(_Time.y), 0, 0), 1), 1);
@@ -273,8 +295,18 @@
 				//return sdmandelbulb(p1, 9);
 				//return min(abs(rotate(p, float3(0, 0, 0)).y), smin(sdmandelbulb(rotate(p-float3(0, 2, 0), float3(UNITY_PI*.5, 0, 0)), 8), sdsphere(p-float3(1, 3, 0), 2)));
 				//return smin(sdmandelbulb(rotate(rotate(p, float3(UNITY_PI*.5, 0, 0)), float3(sin(-p.z*.3+_Time.y*.5), sin(p.x*.3+_Time.y*.5), sin(p.y*.3+_Time.y*.5)))), 10, .8);
-				return noise(p.xz*.5) + noise(p.xz*1)*.5 + noise(p.xz*2)*.25 + noise(p.xz*4)*.125 + noise(p.xz*8)*.0625 + p.y;
-
+				/*float sum = 0;
+				for (float i = 0; i < 6; i++) {
+					sum += noise(p.xz * pow(2, i)) * pow(.5, i);
+				}
+				return sum + p.y;*/
+				//return noise(p.xz*.5) + noise(p.xz*1)*.5 + noise(p.xz*2)*.25 + noise(p.xz*4)*.125 + noise(p.xz*8)*.0625 + noise(p.xz*16)*.03125 + p.y;
+				//return sdmandelbulb(p);
+				//return min(sdsphere(p-float3(1, 0, 0), 1), sdsphere(p-float3(-1, 0, 0), 1));
+				return smin(sdmandelbulb(p-float3(1, 0, 0), 9), sdsphere(p-float3(-1, 0, 0), 2), 2);
+				//return min(
+				//	sdcylinder(p, 1, 1.4), sdsphere(float3(p.x, p.y*0.7, p.z)-float3(0, .9, 0), 1.9)
+				//);
 			}
 
 			ray raymarch(float3 ro, float3 rd) {
@@ -384,7 +416,7 @@
 			fixed4 frag(v2f i) : SV_Target{
 
 				light l;
-				l.range = 10;
+				l.range = 1000;
 				l.intensity = 1;
 				l.position = _LightPosition;
 				l.color = float3(.5, 1, 1);
@@ -399,15 +431,29 @@
 				float3 forward = rotate(float3(0., 0., 1 / _FieldOfView), float3(_Rotation.yx, 0.));
 
 				float3 ro = _Position;
-				float3 rd = normalize(view);
-				
-				ray r = raymarch(ro, rd);
-				
-				float3 hitpoint = ro + rd * r.length;
+
+				ray r = raymarch(ro, view);
+
+				bool h = r.hit;
+
+				float3 hitpoint = ro + view * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
 				float3 normal = normalize(rawnormal);
 
-				float3 light = normalize(_LightPosition - hitpoint);
+				for (int i = 0; i < 1; i++) {
+					if (r.hit) {
+					view = reflect(view, normal);
+						r = raymarch(hitpoint + normal * _ContactThreshold, view);
+
+						hitpoint = r.origin + view * r.length;
+						rawnormal = getnormalraw(hitpoint);
+						normal = normalize(rawnormal);
+					}
+				}
+
+
+				//float3 light = normalize(_LightPosition - hitpoint);
+				//float3 light = float3(0, 1, 0);
 
 				//if (r.hit) {
 				//	if (abs(hitpoint.y) < _ContactThreshold) {
@@ -442,16 +488,23 @@
 
 				//col.rgb = r.hit ? lerp((normal * .5 + .5), sky, 0) : sky;
 
-				col.rgb = r.hit ? lerp(float3(.5, .3, .2), float3(1, 1, 1), hitpoint.y + 1) : sky;
+				//float py = hitpoint.y+1.5;
+				//
+				//if (py < .5) {
+				//	col.rgb = lerp(float3(.3, .6, .4) * remap(noise(hitpoint.xz*50), 0, 1, .9, 1), float3(.5, .5, .5), smoothstep(.2, .25, py));
+				//}
+				//else {
+				//	col.rgb = lerp(float3(.5, .5, .5), float3(.95, .95, .95), smoothstep(.5, 1, py));
+				//}
+				//col.rgb *= remap(clamp(dot(normal, float3(1, .5, 1)), 0, 1), 0, 1, .3, 1);
+				//col.rgb = r.hit ? col.rgb : sky;
+				
+				col.rgb = sky;
 
-				//col.rgb = sky;
-				//float dist = r.length;
-				//float3 p = ro + rd * dist;
+				if (h) {
+					col.rgb *= float3(.6, .4, .4);
+				}
 
-				//col.rgb = sdmandelbulb(p).y;
-
-				//float dif = getlight(p);
-				//col.rgb = dif;
 				return col;
 
             }
