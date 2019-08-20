@@ -5,10 +5,13 @@
 		_Position("Camera Position", Vector) = (0, 1, -3, 0)
 		_Rotation("Camera Rotation", Vector) = (0, 0, 0, 0)
 		_LightPosition("Light Position", Vector) = (0, 10, 0, 0)
+		_StepFactor("Step Factor", Range(0.05, 1)) = 1
 		_MaxSteps("Max Steps", Range(0, 2000)) = 100
 		_MaxDist("Max Distance", Range(0, 2000)) = 100
 		_ContactThreshold("Contact Threshold", Range(0.00001, 0.1)) = 0.01
 		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.01)) = 0.01
+		_Reflections("Number of Reflections", Range(0, 10)) = 1
+		_RefractiveIndex("Refractive Index", Range(1, 2)) = 1.5
 		_Skybox("Skybox", Cube) = "black" {}
     }
     SubShader {
@@ -43,10 +46,13 @@
 			float3 _Position;
 			float2 _Rotation;
 			float3 _LightPosition;
+			float _StepFactor;
 			float _MaxSteps;
 			float _MaxDist;
 			float _ContactThreshold;
 			float _NormalSampleScale;
+			float _RefractiveIndex;
+			int _Reflections;
 			samplerCUBE _Skybox;
 
 			struct ray {
@@ -152,7 +158,12 @@
 				(d - b) * u.x * u.y;
 			}
 
-			float sdsphere(float3 p, float r=1.) {
+			float luminance(float3 col) {
+				//return col.x * 0.2126 + col.y * 0.7152 + col.z * 0.0722;
+				return col.x* 0.2990 + col.y * 0.5870 + col.z * 0.1140;
+			}
+
+			float sdsphere(float3 p, float r=1.0) {
 				return length(p) - r*.5;
 			}
 
@@ -262,6 +273,8 @@
 				return 250.0*120.0*a;
 			}
 
+
+
 			float sdscene(float3 p) {
 				//p = length(p) < 5 ? shmod(p, float3(5, 5, 5)) : p;
 				//return smin(sdsphere(p-float3(-sin(_Time.y), 0, 0), 1), sdsphere(p - float3(sin(_Time.y), 0, 0), 1), 1);
@@ -303,20 +316,23 @@
 				//return noise(p.xz*.5) + noise(p.xz*1)*.5 + noise(p.xz*2)*.25 + noise(p.xz*4)*.125 + noise(p.xz*8)*.0625 + noise(p.xz*16)*.03125 + p.y;
 				//return sdmandelbulb(p);
 				//return min(sdsphere(p-float3(1, 0, 0), 1), sdsphere(p-float3(-1, 0, 0), 1));
-				return smin(sdmandelbulb(p-float3(1, 0, 0), 9), sdsphere(p-float3(-1, 0, 0), 2), 2);
+				//return smin(sdmandelbulb(p-float3(1, 0, 0), 9), sdsphere(p-float3(-1, 0, 0), 2), 2);
+				//p = rotate(p, float3(0, 0, 0));
 				//return min(
 				//	sdcylinder(p, 1, 1.4), sdsphere(float3(p.x, p.y*0.7, p.z)-float3(0, .9, 0), 1.9)
 				//);
+				//return smin(smin(sdmandelbulb(float3(p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2), sdmandelbulb(p-float3(0, 0, 0), 9)), sdmandelbulb(float3(-p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2));
+				return sdsphere(p);
 			}
 
 			ray raymarch(float3 ro, float3 rd) {
 				float dm = 0;
 				bool hit;
 				for (int i = 0; i < _MaxSteps; i++) {
-					float3 cp = ro + rd * dm	;
+					float3 cp = ro + rd * dm;
 					float dts = sdscene(cp);
-					dm += dts;
-					if (dts < _ContactThreshold) {
+					dm += abs(dts) * _StepFactor;
+					if (abs(dts) < _ContactThreshold) {
 						hit = true;
 						break;
 					}
@@ -368,7 +384,7 @@
 			}
 
 
-			float getlighthard(float3 p, float3 n, light l) {
+			float getbrightnesshard(float3 p, float3 n, light l) {
 				float dist = length(p - l.position);
 				if (dist >= l.range) {
 					return 0.0;
@@ -376,8 +392,7 @@
 				return lerp(clamp(dot(n, l.position-p), 0, 1) * l.intensity, 0.0, dist/l.range);
 			}
 
-			float getlight(float3 p, float3 n, light l) {
-				// FIX UP
+			float getbrightness(float3 p, float3 n, light l) {
 				float dist = length(p - l.position);
 				if (dist >= l.range) {
 					return 0.0;
@@ -433,24 +448,23 @@
 				float3 ro = _Position;
 
 				ray r = raymarch(ro, view);
-
-				bool h = r.hit;
-
 				float3 hitpoint = ro + view * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
 				float3 normal = normalize(rawnormal);
 
-				for (int i = 0; i < 1; i++) {
-					if (r.hit) {
-					view = reflect(view, normal);
-						r = raymarch(hitpoint + normal * _ContactThreshold, view);
+				ray rref = r;
+				float3 hitpointref = hitpoint;
+				float3 rawnormalref = rawnormal;
+				float3 normalref = normal;
 
-						hitpoint = r.origin + view * r.length;
-						rawnormal = getnormalraw(hitpoint);
-						normal = normalize(rawnormal);
-					}
+				for (int reflections = 0; reflections < _Reflections && rref.hit; reflections++) {
+					view = refract(view, normalref, _RefractiveIndex);
+					rref = raymarch(hitpointref - normalref * _ContactThreshold, view);
+
+					hitpointref = rref.origin + view * rref.length;
+					rawnormalref = getnormalraw(hitpointref);
+					normalref = normalize(rawnormalref);
 				}
-
 
 				//float3 light = normalize(_LightPosition - hitpoint);
 				//float3 light = float3(0, 1, 0);
@@ -499,11 +513,10 @@
 				//col.rgb *= remap(clamp(dot(normal, float3(1, .5, 1)), 0, 1), 0, 1, .3, 1);
 				//col.rgb = r.hit ? col.rgb : sky;
 				
-				col.rgb = sky;
+				col.rgb = r.hit ? texCUBE(_Skybox, -view) : sky;
+				//col.rgb = sky * pow(float3(.6, .8, .6), reflections);
 
-				if (h) {
-					col.rgb *= float3(.6, .4, .4);
-				}
+				//if (h) { col.rgb *= float3(.6, .4, .4); }
 
 				return col;
 
