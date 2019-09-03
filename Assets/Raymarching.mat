@@ -94,5 +94,5 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _LightPosition: {r: 0, g: 1.2, b: 0, a: 0}
-    - _Position: {r: -0.1742951, g: 2.5689926, b: 0.6589914, a: 0}
-    - _Rotation: {r: 53.098877, g: 1.036118, b: 0, a: 0}
+    - _Position: {r: -1.2534783, g: 1.8876071, b: 3.345961, a: 0}
+    - _Rotation: {r: 2.652902, g: -0.14835297, b: 0, a: 0}

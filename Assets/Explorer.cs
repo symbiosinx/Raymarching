@@ -15,6 +15,10 @@ public class Explorer : MonoBehaviour {
 	Vector3 pos = new Vector3(0f, 1f, -3f);
 	Vector2 rot = Vector2.zero;
 
+	void Start() {
+		Cursor.visible = false;
+	}
+
 	void Update() {
 
 		plane.localScale = new Vector3(aspectRatio, 1f, 1f);
@@ -56,6 +60,8 @@ public class Explorer : MonoBehaviour {
 		if (Input.GetKey(KeyCode.LeftArrow)) {
 			rot.x -= rotSpeed * Time.deltaTime;
 		}
+
+		rot += new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
 
 		rot.y = Mathf.Clamp(rot.y, -90f, 90f);
 		pos += (Quaternion.Euler(0f, rot.x, 0f) * dir) * speed * Time.deltaTime;
