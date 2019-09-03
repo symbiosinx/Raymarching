@@ -167,6 +167,11 @@
 				return length(p) - r*.5;
 			}
 
+			float sdbox(float3 p, float3 b = float3(1.0, 1.0, 1.0)) {
+				float3 d = abs(p) - b;
+				return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+			}
+
 			float sdtorus(float3 p, float2 t=float2(1, .5)) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
 				return length(q) - t.y;
@@ -203,7 +208,7 @@
 					z += p;
 
 				}
-				return float2(0.5 * log(r) * r / dr, o/iters);
+				return float2(0.5 * log(r) * r / dr, o);
 			}
 
 			float sdmandelbrot(float3 p, int iters=10, float bailout=10) {
@@ -231,7 +236,7 @@
 				float3 c;
 				int n = 0;
 				float dist, d;
-				while (n < 20) {
+				while (n < 5) {
 					c = a1; dist = length(z-a1);
 					d = length(z-a2); if (d < dist) { c = a2; dist=d; }
 					d = length(z-a3); if (d < dist) { c = a3; dist=d; }
@@ -322,7 +327,21 @@
 				//	sdcylinder(p, 1, 1.4), sdsphere(float3(p.x, p.y*0.7, p.z)-float3(0, .9, 0), 1.9)
 				//);
 				//return smin(smin(sdmandelbulb(float3(p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2), sdmandelbulb(p-float3(0, 0, 0), 9)), sdmandelbulb(float3(-p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2));
-				return sdsphere(p);
+				//return sdbox(p);
+				//float3 p1 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*0, 0)) - p;
+				//float3 p2 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*1, 0)) - p;
+				//float3 p3 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*2, 0)) - p;
+				//float3 p4 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*3, 0)) - p;
+				//float3 p5 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*4, 0)) - p;
+				//
+				//return min(min(sdsphere(p1), min(sdsphere(p2), min(sdsphere(p3), min(sdsphere(p4), sdsphere(p5))))), p.y+1);
+				//return lerp(lerp(sdmenger(p), sdcylinder(p, 1, 1), 5), lerp(sdmenger(p), sdsphere(p, 2), 5), 3);
+				//return lerp(sdmenger(p), sdmandelbulb(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
+				//return lerp(sdmenger(p), sdsierpinski(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
+				//return sdmandelbulb(p, 9) + noise(float2(p.x + p.z*.5, p.y + p.z*.5)) * .1;
+				//return sdmandelbulb(p, 9);
+				return sdcylinder(p, .6, 1);
+				//return sdbox(p, 1);
 			}
 
 			ray raymarch(float3 ro, float3 rd) {
@@ -434,10 +453,10 @@
 				l.range = 1000;
 				l.intensity = 1;
 				l.position = _LightPosition;
-				l.color = float3(.5, 1, 1);
+				l.color = float3(1, 1, 1);
 
 				fixed4 col;
-				col.a = 1;
+				col.rgba = 1;
 
 				float3 view = float3(-i.uv.x*_AspectRatio+_AspectRatio*.5, -i.uv.y+.5, 1./_FieldOfView);
 				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
@@ -446,25 +465,58 @@
 				float3 forward = rotate(float3(0., 0., 1 / _FieldOfView), float3(_Rotation.yx, 0.));
 
 				float3 ro = _Position;
+				float3 rd = view;
 
-				ray r = raymarch(ro, view);
-				float3 hitpoint = ro + view * r.length;
+				ray r = raymarch(ro, rd);
+				float3 hitpoint = ro + rd * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
 				float3 normal = normalize(rawnormal);
 
-				ray rref = r;
-				float3 hitpointref = hitpoint;
-				float3 rawnormalref = rawnormal;
-				float3 normalref = normal;
+				//ray rref = r;
+				//float3 hitpointref = hitpoint;
+				//float3 rawnormalref = rawnormal;
+				//float3 normalref = normal;
+				//
+				//for (int reflections = 0; reflections < _Reflections && rref.hit; reflections++) {
+				//	//rd = refract(rd, normalref, _RefractiveIndex);
+				//	//rref = raymarch(hitpointref - normalref * _ContactThreshold, rd);
+				//	rd = reflect(rd, normalref);
+				//	rref = raymarch(hitpointref + normalref * _ContactThreshold, rd);
+				//
+				//	hitpointref = rref.origin + rd * rref.length;
+				//	rawnormalref = getnormalraw(hitpointref);
+				//	normalref = normalize(rawnormalref);
+				//}
 
-				for (int reflections = 0; reflections < _Reflections && rref.hit; reflections++) {
-					view = refract(view, normalref, _RefractiveIndex);
-					rref = raymarch(hitpointref - normalref * _ContactThreshold, view);
-
-					hitpointref = rref.origin + view * rref.length;
-					rawnormalref = getnormalraw(hitpointref);
-					normalref = normalize(rawnormalref);
-				}
+				//ray rr = r;
+				//for (int bounces = 0; bounces < 5 && rr.hit; bounces++) {
+				//	if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*0, 0))) <= .5 + _ContactThreshold) {
+				//		col.rgb *= float3(.9, .9, .6);
+				//	}
+				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*1, 0))) <= .5 + _ContactThreshold) {
+				//		col.rgb *= float3(.6, .9, .6);
+				//	}
+				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*2, 0))) <= .5 + _ContactThreshold) {
+				//		col.rgb *= float3(.6, .9, .9);
+				//	}
+				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*3, 0))) <= .5 + _ContactThreshold) {
+				//		col.rgb *= float3(.9, .6, .6);
+				//	}
+				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*4, 0))) <= .5 + _ContactThreshold) {
+				//		col.rgb *= float3(.9, .6, .9);
+				//	} else {
+				//		break;
+				//	}
+				//	rd = reflect(rd, normal);
+				//	rr = raymarch(hitpoint + normal * _ContactThreshold, rd);
+				//	hitpoint = rr.origin + rd * rr.length;
+				//	rawnormal = getnormalraw(hitpoint);
+				//	normal = normalize(rawnormal);
+				//}
+				//
+				//if (length(hitpoint.y+1) <= _ContactThreshold) {
+				//	col.rgb *= ((mod(hitpoint.x, 2) < 1) ^ (mod(hitpoint.z, 2) < 1)) ? float3(.9, .9, .9) : float3(.1, .1, .1);
+				//}
 
 				//float3 light = normalize(_LightPosition - hitpoint);
 				//float3 light = float3(0, 1, 0);
@@ -495,7 +547,7 @@
 				//	col.rgb = 0;
 				//}
 
-				float3 sky = texCUBE(_Skybox, view);
+				float3 sky = texCUBE(_Skybox, rd);
 
 				//col.rgb = (r.hit ? getAO(rawnormal) * 1 * getlight(hitpoint, normal, l) * getshadow(hitpoint, normal) : texCUBE(_Skybox, view)) + .025 * getscatter(r, l);
 				//col.rgb = ((normal * .5 + .5) * (clamp(getAO(rawnormal), 0, 1)) * (1-r.steps/100)) + .025 * getscatter(r, l);
@@ -513,11 +565,23 @@
 				//col.rgb *= remap(clamp(dot(normal, float3(1, .5, 1)), 0, 1), 0, 1, .3, 1);
 				//col.rgb = r.hit ? col.rgb : sky;
 				
-				col.rgb = r.hit ? texCUBE(_Skybox, -view) : sky;
+				//col.rgb = rr.hit ? col.rgb : col.rgb * sky;
 				//col.rgb = sky * pow(float3(.6, .8, .6), reflections);
 
 				//if (h) { col.rgb *= float3(.6, .4, .4); }
 
+				float3 insiderd = normalize(l.position-hitpoint);
+				ray insideray = raymarch(hitpoint - normal * _ContactThreshold * 2, insiderd);
+				float thickness = insideray.length;
+
+				col.rgb = r.hit ? 
+					//(lerp(float3(.9, .2, .9), float3(.3, .3, .9), remap(sdmandelbulb(hitpoint, 9).y, .75, 1, 0, 1)))
+					pow(clamp(dot(normal, l.position-hitpoint), 0, 1)*.5+.5, 2) * float3(1, .8, .8) +
+					(1-thickness*.25) * clamp(dot(insiderd, view), 0, 1) * float3(2, .8, .2)
+					: sky * .3;
+				//col.rgb += r.steps * .0025;
+				col.rgb *= getAO(rawnormal);
+				col.rgb += getscatter(r, l) * .025 * l.color;
 				return col;
 
             }
