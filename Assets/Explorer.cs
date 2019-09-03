@@ -15,9 +15,7 @@ public class Explorer : MonoBehaviour {
 	Vector3 pos = new Vector3(0f, 1f, -3f);
 	Vector2 rot = Vector2.zero;
 
-	void Start() {
-		Cursor.visible = false;
-	}
+	bool mouse = false;
 
 	void Update() {
 
@@ -60,8 +58,20 @@ public class Explorer : MonoBehaviour {
 		if (Input.GetKey(KeyCode.LeftArrow)) {
 			rot.x -= rotSpeed * Time.deltaTime;
 		}
+		if (Input.GetKey(KeyCode.M)) {
+			mouse = !mouse;
+			if (mouse) {
+				Cursor.visible = false;
+				Cursor.lockState = CursorLockMode.Locked;
+			} else {
+				Cursor.visible = true;
+				Cursor.lockState = CursorLockMode.None;
+			}
+		}
 
-		rot += new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+		if (mouse) {
+			rot += new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+		}
 
 		rot.y = Mathf.Clamp(rot.y, -90f, 90f);
 		pos += (Quaternion.Euler(0f, rot.x, 0f) * dir) * speed * Time.deltaTime;

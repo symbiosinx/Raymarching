@@ -13,6 +13,8 @@
 		_Reflections("Number of Reflections", Range(0, 10)) = 1
 		_RefractiveIndex("Refractive Index", Range(1, 2)) = 1.5
 		_Skybox("Skybox", Cube) = "black" {}
+		_Color1("Color 1", Color) = (0, 0, 0, 1)
+		_Color2("Color 2", Color) = (1, 1, 1, 1)
     }
     SubShader {
         Cull Off ZWrite On ZTest LEqual
@@ -54,6 +56,8 @@
 			float _RefractiveIndex;
 			int _Reflections;
 			samplerCUBE _Skybox;
+			float3 _Color1;
+			float3 _Color2;
 
 			struct ray {
 				bool hit;
@@ -100,6 +104,14 @@
 				//	sy * cp * cr - cy * sp * sr
 				//);
 				//return qmul(qmul(float4(v, 0), q), float4(q.x, -q.y, -q.z, -q.w)).xyz;
+			}
+
+			float sq(float x) {
+				return x*x;
+			}
+
+			float3 sq(float3 x) {
+				return x*x;
 			}
 
 			float remap(float x, float o1, float o2, float n1, float n2) {
@@ -339,9 +351,8 @@
 				//return lerp(sdmenger(p), sdmandelbulb(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
 				//return lerp(sdmenger(p), sdsierpinski(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
 				//return sdmandelbulb(p, 9) + noise(float2(p.x + p.z*.5, p.y + p.z*.5)) * .1;
-				//return sdmandelbulb(p, 9);
-				return sdcylinder(p, .6, 1);
-				//return sdbox(p, 1);
+				//return lerp(sdmandelbulb(p, 9), sdmenger(p), sin(_Time.y)*.5+.5);
+				return lerp(sdsphere(p, 2), sdbox(rotate(p, float3(_Time.y*1.618, _Time.y*1.414, _Time.y*.1))), 2);
 			}
 
 			ray raymarch(float3 ro, float3 rd) {
@@ -453,6 +464,7 @@
 				l.range = 1000;
 				l.intensity = 1;
 				l.position = _LightPosition;
+				//l.color = float3(1, .4, .2);
 				l.color = float3(1, 1, 1);
 
 				fixed4 col;
@@ -573,15 +585,16 @@
 				float3 insiderd = normalize(l.position-hitpoint);
 				ray insideray = raymarch(hitpoint - normal * _ContactThreshold * 2, insiderd);
 				float thickness = insideray.length;
-
+				
 				col.rgb = r.hit ? 
 					//(lerp(float3(.9, .2, .9), float3(.3, .3, .9), remap(sdmandelbulb(hitpoint, 9).y, .75, 1, 0, 1)))
-					pow(clamp(dot(normal, l.position-hitpoint), 0, 1)*.5+.5, 2) * float3(1, .8, .8) +
-					(1-thickness*.25) * clamp(dot(insiderd, view), 0, 1) * float3(2, .8, .2)
+					pow(clamp(dot(normal, l.position-hitpoint)*.5+.5, 0, 1), 2) * l.color
+					//+ (1-thickness*.25) * clamp(dot(insiderd, view)*.5+.5, 0, 1) * float3(2, .8, .2)
 					: sky * .3;
 				//col.rgb += r.steps * .0025;
 				col.rgb *= getAO(rawnormal);
 				col.rgb += getscatter(r, l) * .025 * l.color;
+
 				return col;
 
             }
