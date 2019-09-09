@@ -63,36 +63,43 @@ Material:
     - _AspectRatio: 1.7777778
     - _BentNormalSampleScale: 0.0287
     - _BumpScale: 1
-    - _ContactThreshold: 0.0101
+    - _ContactThreshold: 0.001
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _FieldOfView: 1.5
+    - _FractalRotationX: 0.02
+    - _FractalRotationY: -0.5
+    - _FractalRotationZ: -0.28
+    - _FractalScale: 1.5
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _MaxDist: 519
-    - _MaxSteps: 810
+    - _MaxDist: 50
+    - _MaxSteps: 200
     - _Metallic: 0
     - _Mode: 0
-    - _NormalSampleScale: 0.00069
+    - _NormalSampleScale: 0.01
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _Reflections: 3.12
     - _RefractiveIndex: 1
     - _SDScene: 0
     - _Size: 1
+    - _Smoothness: 0.2
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _StepFactor: 0.592
+    - _StepFactor: 0.5
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
     - _AspectRatio: {r: 1, g: 1, b: 0, a: 0}
     - _CameraRotation: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color1: {r: 1, g: 1, b: 1, a: 1}
+    - _Color2: {r: 0.75, g: 0.5, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _LightPosition: {r: 0, g: 1.2, b: 0, a: 0}
-    - _Position: {r: -1.2534783, g: 1.8876071, b: 3.345961, a: 0}
-    - _Rotation: {r: 2.652902, g: -0.14835297, b: 0, a: 0}
+    - _LightPosition: {r: 0, g: 0, b: 0, a: 0}
+    - _Position: {r: 0.26247424, g: 0.51483876, b: 3.5353544, a: 0}
+    - _Rotation: {r: 3.2972505, g: 0.090483844, b: 0, a: 0}
