@@ -86,6 +86,7 @@
 				float3 color;
 			};
 
+
 			float4 qmul(float4 v, float4 q) {
 				return float4(
 					v.x*q.x - v.y*q.y - v.z*q.z - v.w * q.w,
@@ -187,6 +188,19 @@
 				return col.x* 0.2990 + col.y * 0.5870 + col.z * 0.1140;
 			}
 
+			void boxfold(inout float3 p, float b=1) {
+				b *= .5;
+				p = clamp(p, -b, b) * 2.0 - p;
+			}
+
+			void spherefold(inout float3 p, float R=1.0) {
+				//float R = 1.0;
+				float r = length(p);
+				if (r<R) p = p*R*R/(r*r);
+			}
+
+
+
 			float sphere(float3 p, float r=1.0) {
 				return length(p) - r*.5;
 			}
@@ -205,7 +219,6 @@
 			  float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
 			  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
 			}
-
 
 			float4 mandelbulb(float3 p, float e=8, float iters=12, float bailout=10) {
 				float3 z = p;
@@ -230,6 +243,7 @@
 					float zr = pow(r, e);
 					theta = theta * e;
 					phi = phi * e;
+
 
 					// convert back to cartesian coordinates
 					z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
@@ -272,7 +286,7 @@
 					z = 2.0*z-c*(2.0-1.0);
 					n++;
 				}
-			return length(z) * pow(2.0, float(-n));
+				return length(z) * pow(2.0, float(-n));
 			}
 
 			float4 sierpinski3(float3 p) {
@@ -283,14 +297,16 @@
 				float o = bailout;
 				float o2 = bailout;
 				float o3 = bailout;
+				float3 c;
 				for (float i = 0; i < 15 && r < bailout; i++) {
 					//Folding... These are some of the symmetry planes of the tetrahedron
 					if (x + y < 0) { float x1 = -y;y = -x;x = x1; }
 					if (x + z < 0) { float x1 = -z;z = -x;x = x1; }
 					if (y + z < 0) { float y1 = -z;z = -y;y = y1; }
 
-					p = rotate(float3(x, y, z), float3(_FractalRotationX, _FractalRotationY, _FractalRotationZ));
-					x = p.x; y = p.y; z = p.z;
+					c = float3(x, y, z);
+					c = rotate(c, float3(_FractalRotationX, _FractalRotationY, _FractalRotationZ));
+					x = c.x; y = c.y; z = c.z;
 
 					//Stretches about the point [1,1,1]*(scale-1)/scale; The "(scale-1)/scale" is here in order to keep the size of the fractal constant wrt scale
 					x = scale * x - (scale - 1); //equivalent to: x=scale*(x-cx); where cx=(scale-1)/scale;
@@ -344,69 +360,10 @@
 
 
 			float4 sdscene(float3 p) {
-				//p = length(p) < 5 ? shmod(p, float3(5, 5, 5)) : p;
-				//return smin(sdsphere(p-float3(-sin(_Time.y), 0, 0), 1), sdsphere(p - float3(sin(_Time.y), 0, 0), 1), 1);
-				//float t = sdtorus(cpos, float3(0, 0, 5), float2(2, .5));
-				//float p = cpos.y;
-				//return smin(p, t);
-				//float3 cpos = _Position.xyz;
-				//float3 p1 = shmod(p, (float3)(5));
-				//return sdmandelbulb(p-float3(0, 0, 5), 7).x;
-				//float2 r1 = float2(cos(1.2), sin(1.2));
-				//float3x3 m1 = { r1.x, 0, r1.y,
-				//			   0, 1, 0,
-				//			   r1.y, 0, r1.x };
-				//float2 r2 = float2(cos(2), sin(2));
-				//float3x3 m2 = { 1, 0, 0, 
-				//				0, r2.x, -r2.y,
-				//				0, r2.y, r2.x };
-				//float2 r3 = float2(cos(.5), sin(.5));
-				//float3x3 m3 = { r3.x, -r3.y, 0, 
-				//				r3.y, r3.x, 0,
-				//				0, 0, 1 };
-				//float3 p1 = shmod(mul(m1, p+float3(1, 1, 1)), float3(4, 4, 4));
-				//float3 p2 = shmod(mul(m2, p), float3(4, 4, 4));
-				//float3 p3 = shmod(mul(m3, p+float3(-1, -1, -2)), float3(5, 4, 3));
-				//return smin(smin(sdsierpinski(p1), sdmenger(p2), 1), sdmandelbulb(p3, 8));
-				//return sdmenger(p.x, p.y, p.z);
-				//p = float3(p.x * cos(p.y * .0) - p.z * sin(p.y * .0), p.y, p.x * sin(p.y * .0) + p.z * cos(p.y * .0));
-				//p = float3(p.y * cos(p.x * .0) - p.z * sin(p.x * .0), p.x, p.y * sin(p.x * .0) 1+ p.z * cos(p.x * .0));
-				//p = rotate(p, float3(sin(p.y*.5+_Time.y), sin(p.z*.5+_Time.y), sin(p.x*.5+_Time.y)));
-				//float3 p1 = rotate(shmod(p, 5), float3(0, _Time.y, 0));
-				//return sdmandelbulb(p1, 9);
-				//return min(abs(rotate(p, float3(0, 0, 0)).y), smin(sdmandelbulb(rotate(p-float3(0, 2, 0), float3(UNITY_PI*.5, 0, 0)), 8), sdsphere(p-float3(1, 3, 0), 2)));
-				//return smin(sdmandelbulb(rotate(rotate(p, float3(UNITY_PI*.5, 0, 0)), float3(sin(-p.z*.3+_Time.y*.5), sin(p.x*.3+_Time.y*.5), sin(p.y*.3+_Time.y*.5)))), 10, .8);
-				/*float sum = 0;
-				for (float i = 0; i < 6; i++) {
-					sum += noise(p.xz * pow(2, i)) * pow(.5, i);
-				}
-				return sum + p.y;*/
-				//return noise(p.xz*.5) + noise(p.xz*1)*.5 + noise(p.xz*2)*.25 + noise(p.xz*4)*.125 + noise(p.xz*8)*.0625 + noise(p.xz*16)*.03125 + p.y;
-				//return sdmandelbulb(p);
-				//return min(sdsphere(p-float3(1, 0, 0), 1), sdsphere(p-float3(-1, 0, 0), 1));
-				//return smin(sdmandelbulb(p-float3(1, 0, 0), 9), sdsphere(p-float3(-1, 0, 0), 2), 2);
-				//p = rotate(p, float3(0, 0, 0));
-				//return min(
-				//	sdcylinder(p, 1, 1.4), sdsphere(float3(p.x, p.y*0.7, p.z)-float3(0, .9, 0), 1.9)
-				//);
-				//return smin(smin(sdmandelbulb(float3(p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2), sdmandelbulb(p-float3(0, 0, 0), 9)), sdmandelbulb(float3(-p.x, p.y, p.z*.5)*1.5-float3(2, 0, 0), 2));
-				//return sdbox(p);
-				//float3 p1 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*0, 0)) - p;
-				//float3 p2 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*1, 0)) - p;
-				//float3 p3 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*2, 0)) - p;
-				//float3 p4 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*3, 0)) - p;
-				//float3 p5 = rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*4, 0)) - p;
-				//
-				//return min(min(sdsphere(p1), min(sdsphere(p2), min(sdsphere(p3), min(sdsphere(p4), sdsphere(p5))))), p.y+1);
-				//return lerp(lerp(sdmenger(p), sdcylinder(p, 1, 1), 5), lerp(sdmenger(p), sdsphere(p, 2), 5), 3);
-				//return lerp(sdmenger(p), sdmandelbulb(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
-				//return lerp(sdmenger(p), sdsierpinski(rotate(p, float3(_Time.y*.1, _Time.y*.15, _Time.y*.2))), 2);
-				//return sdmandelbulb(p, 9) + noise(float2(p.x + p.z*.5, p.y + p.z*.5)) * .1;
-				//return lerp(sdmandelbulb(p, 9), sdmenger(p), sin(_Time.y)*.5+.5);
-				//return lerp(sdsphere(p, 2), sdbox(rotate(p, float3(UNITY_PI*.25, UNITY_PI*.25, 0))), 3);
-				//return sdmandelbulb(p, 5+rotate(p, float3(_Time.y*1, _Time.y*1.414, _Time.y*1.618)).z);
-				return sierpinski3(p);
+				return float4(sphere(p), 1, 1, 1);
 			}
+
+
 
 			ray raymarch(float3 ro, float3 rd) {
 				float dm = 0;
@@ -466,7 +423,6 @@
 				return normalize(getnormalraw(p, s));
 			}
 
-
 			float getbrightnesshard(float3 p, float3 n, light l) {
 				float dist = length(p - l.position);
 				if (dist >= l.range) {
@@ -511,6 +467,13 @@
 				return s * (atan((r.length + b) * s) - atan(b * s));
 			}
 
+			float3 refract2(float3 i, float3 n, float eta) {
+				eta = 2.0f - eta;
+				float cosi = dot(n, i);
+				float3 o = (i * eta - n * (-cosi + eta * cosi));
+				return o;
+			}
+
 			fixed4 frag(v2f i) : SV_Target{
 
 				light l;
@@ -521,6 +484,7 @@
 				l.color = float3(.8, .7, .6);
 
 				fixed3 col;
+				col.rgb = 1;
 
 				float3 view = float3(-i.uv.x*_AspectRatio+_AspectRatio*.5, -i.uv.y+.5, 1./_FieldOfView);
 				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
@@ -530,143 +494,34 @@
 
 				float3 ro = _Position;
 				float3 rd = view;
+				float dist = 0.0;
 
 				ray r = raymarch(ro, rd);
+				dist += r.length;
 				float3 hitpoint = ro + rd * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
 				float3 normal = normalize(rawnormal);
 
-				//ray rref = r;
-				//float3 hitpointref = hitpoint;
-				//float3 rawnormalref = rawnormal;
-				//float3 normalref = normal;
-				//
-				//for (int reflections = 0; reflections < _Reflections && rref.hit; reflections++) {
-				//	//rd = refract(rd, normalref, _RefractiveIndex);
-				//	//rref = raymarch(hitpointref - normalref * _ContactThreshold, rd);
-				//	rd = reflect(rd, normalref);
-				//	rref = raymarch(hitpointref + normalref * _ContactThreshold, rd);
-				//
-				//	hitpointref = rref.origin + rd * rref.length;
-				//	rawnormalref = getnormalraw(hitpointref);
-				//	normalref = normalize(rawnormalref);
-				//}
 
-				//ray rr = r;
-				//for (int bounces = 0; bounces < 5 && rr.hit; bounces++) {
-				//	if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*0, 0))) <= .5 + _ContactThreshold) {
-				//		col.rgb *= float3(.9, .9, .6);
-				//	}
-				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*1, 0))) <= .5 + _ContactThreshold) {
-				//		col.rgb *= float3(.6, .9, .6);
-				//	}
-				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*2, 0))) <= .5 + _ContactThreshold) {
-				//		col.rgb *= float3(.6, .9, .9);
-				//	}
-				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*3, 0))) <= .5 + _ContactThreshold) {
-				//		col.rgb *= float3(.9, .6, .6);
-				//	}
-				//	else if (length(hitpoint - rotate(float3(0, 0, 1), float3(0, UNITY_PI/5*2*4, 0))) <= .5 + _ContactThreshold) {
-				//		col.rgb *= float3(.9, .6, .9);
-				//	} else {
-				//		break;
-				//	}
-				//	rd = reflect(rd, normal);
-				//	rr = raymarch(hitpoint + normal * _ContactThreshold, rd);
-				//	hitpoint = rr.origin + rd * rr.length;
-				//	rawnormal = getnormalraw(hitpoint);
-				//	normal = normalize(rawnormal);
-				//}
-				//
-				//if (length(hitpoint.y+1) <= _ContactThreshold) {
-				//	col.rgb *= ((mod(hitpoint.x, 2) < 1) ^ (mod(hitpoint.z, 2) < 1)) ? float3(.9, .9, .9) : float3(.1, .1, .1);
-				//}
-
-				//float3 light = normalize(_LightPosition - hitpoint);
-				//float3 light = float3(0, 1, 0);
-
-				//if (r.hit) {
-				//	if (abs(hitpoint.y) < _ContactThreshold) {
-				//		if (mod(hitpoint.x, 2) < 1 ^ mod(hitpoint.z, 2) < 1) {
-				//			col.rgb = .2;
-				//		} else {
-				//			col.rgb = 1;
-				//		}
-				//	}
-				//	else {
-				//		if (dot(normal, -view) < .3) {
-				//			col.rgb = 0;
-				//		} else {
-				//			col.rgb = dot(normal, light) > 0 ? .8 : .5;
-				//			float3 ref = reflect(light, normal);
-				//			float spec = smoothstep(pow(max(dot(view, ref), 0), 16), .1, 0);
-				//			col += spec;
-				//		}
-				//
-				//		
-				//	}
-				//	col.rgb *= remap(getshadow(hitpoint), 0, 1, .5, 1);
-				//	//col.rgb *= (1 - r.steps / 100);
-				//} else {
-				//	col.rgb = 0;
-				//}
+				for (int i = 0; i < 1 && r.hit; i++) {
+					ro = hitpoint - normal * _ContactThreshold * 2;
+					rd = sign(sdscene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
+					r = raymarch(ro, rd);
+					dist += r.length;
+					hitpoint = ro + rd * r.length;
+					rawnormal = getnormalraw(hitpoint);
+					normal = normalize(rawnormal);
+					col = clamp(sdscene(hitpoint).yzw * .75, 0, 1);
+				}
 
 				float3 sky = texCUBE(_Skybox, rd);
 
-				//col.rgb = (r.hit ? getAO(rawnormal) * 1 * getlight(hitpoint, normal, l) * getshadow(hitpoint, normal) : texCUBE(_Skybox, view)) + .025 * getscatter(r, l);
-				//col.rgb = ((normal * .5 + .5) * (clamp(getAO(rawnormal), 0, 1)) * (1-r.steps/100)) + .025 * getscatter(r, l);
-
-				//col.rgb = r.hit ? lerp((normal * .5 + .5), sky, 0) : sky;
-
-				//float py = hitpoint.y+1.5;
-				//
-				//if (py < .5) {
-				//	col.rgb = lerp(float3(.3, .6, .4) * remap(noise(hitpoint.xz*50), 0, 1, .9, 1), float3(.5, .5, .5), smoothstep(.2, .25, py));
-				//}
-				//else {
-				//	col.rgb = lerp(float3(.5, .5, .5), float3(.95, .95, .95), smoothstep(.5, 1, py));
-				//}
-				//col.rgb *= remap(clamp(dot(normal, float3(1, .5, 1)), 0, 1), 0, 1, .3, 1);
-				//col.rgb = r.hit ? col.rgb : sky;
-				
-				//col.rgb = rr.hit ? col.rgb : col.rgb * sky;
-				//col.rgb = sky * pow(float3(.6, .8, .6), reflections);
-
-				//if (h) { col.rgb *= float3(.6, .4, .4); }
-
-				//float3 insiderd = normalize(l.position-hitpoint);
-				//ray insideray = raymarch(hitpoint - normal * _ContactThreshold * 2, insiderd);
-				//float thickness = insideray.length;
-				//float3 insidepoint = insideray.origin + insideray.direction * insideray.length;
-				//float3 insidenormal = normalize(getnormalraw(insidepoint));
-				//
-				//for (int i = 0; i < 12; i++) {
-				//	insiderd = normalize(l.position - insidepoint);
-				//	insideray = raymarch(insidepoint - insidenormal * _ContactThreshold * 2, insiderd);
-				//	thickness += insideray.length;
-				//	insidepoint = insideray.origin + insideray.direction * insideray.length;
-				//	insidenormal = normalize(getnormalraw(insidepoint));
-				//}
-
-				//col.rgb = r.hit ? 
-				//	//(lerp(float3(.9, .2, .9), float3(.3, .3, .9), remap(sdmandelbulb(hitpoint, 9).y, .75, 1, 0, 1)))
-				//	pow(clamp(dot(normal, l.position-hitpoint)*.5+.5, 0, 1), 2) * l.color
-				//	+ (1-thickness*.25) * clamp(dot(insiderd, view)*.5+.5, 0, 1) * float3(2, .8, .2)
-				//	: sky * .3;
-				////col.rgb += r.steps * .0025;
-				//col.rgb *= getAO(rawnormal);
-				//col.rgb += getscatter(r, l) * .025 * l.color;
-
-				float3 diffuse = clamp(sdscene(hitpoint).yzw * .75, 0, .75);
-				if (r.hit) sky = texCUBE(_Skybox, reflect(view, normal));
-
 				col = r.hit ?
-					//lerp((-normal*.5+.5)+.5, float3(.1, 0, .1), sdmandelbulb(hitpoint).y * clamp(getAO(rawnormal)+.5, 0, 1))
-					lerp(diffuse, sky, _Smoothness)
-					//sq(normal*.5+.5)
-					//+ getAO(rawnormal) * .1
+
+					sky
+
 					: sky;
-				col += r.steps / 100 * _StepFactor;
+				//col += r.steps / 100 * _StepFactor;
 				return fixed4(col, 1);
 
             }

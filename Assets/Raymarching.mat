@@ -68,9 +68,9 @@ Material:
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _FieldOfView: 1.5
-    - _FractalRotationX: 0.02
-    - _FractalRotationY: -0.5
-    - _FractalRotationZ: -0.28
+    - _FractalRotationX: -0.198
+    - _FractalRotationY: -0.366
+    - _FractalRotationZ: 0
     - _FractalScale: 1.5
     - _GlossMapScale: 1
     - _Glossiness: 0.5
@@ -101,5 +101,5 @@ Material:
     - _Color2: {r: 0.75, g: 0.5, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _LightPosition: {r: 0, g: 0, b: 0, a: 0}
-    - _Position: {r: 0.26247424, g: 0.51483876, b: 3.5353544, a: 0}
-    - _Rotation: {r: 3.2972505, g: 0.090483844, b: 0, a: 0}
+    - _Position: {r: -0.9260058, g: 0.029854577, b: -1.5925188, a: 0}
+    - _Rotation: {r: -37.3444, g: -0.10043079, b: 0, a: 0}
