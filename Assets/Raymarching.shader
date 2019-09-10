@@ -19,8 +19,7 @@
 		_FractalRotationX("Fractal Rotation X", Range(-.5, .5)) = 0
 		_FractalRotationY("Fractal Rotation Y", Range(-.5, .5)) = 0
 		_FractalRotationZ("Fractal Rotation Z", Range(-.5, .5)) = 0
-		_Smoothness("Smoothness", Range(0, 1)) = 0
-		_Metallic("Metallic", Range(0, 1)) = 0
+		_Glossiness("Glossiness", Range(0, 1)) = 0
     }
     SubShader {
         Cull Off ZWrite On ZTest LEqual
@@ -68,8 +67,7 @@
 			float _FractalRotationX;
 			float _FractalRotationY;
 			float _FractalRotationZ;
-			float _Smoothness;
-			float _Metallic;
+			float _Glossiness;
 
 			struct ray {
 				bool hit;
@@ -201,23 +199,23 @@
 
 
 
-			float sphere(float3 p, float r=1.0) {
-				return length(p) - r*.5;
+			float4 sphere(float3 p, float r=1.0) {
+				return float4(length(p) - r*.5, 1, 1, 1);
 			}
 
-			float box(float3 p, float3 b = float3(1.0, 1.0, 1.0)) {
+			float4 box(float3 p, float3 b = float3(1.0, 1.0, 1.0)) {
 				float3 d = abs(p) - b;
-				return length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0);
+				return float4(length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0), 1, 1, 1);
 			}
 
-			float torus(float3 p, float2 t=float2(1, .5)) {
+			float4 torus(float3 p, float2 t=float2(1, .5)) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
-				return length(q) - t.y;
+				return float4(length(q) - t.y, 1, 1, 1);
 			}
 
-			float cylinder(float3 p, float h, float r) {
-			  float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
-			  return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+			float4 cylinder(float3 p, float h=1, float r=1) {
+				float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
+				return float4(min(max(d.x,d.y),0.0) + length(max(d,0.0)), 1, 1, 1);
 			}
 
 			float4 mandelbulb(float3 p, float e=8, float iters=12, float bailout=10) {
@@ -253,43 +251,7 @@
 				return float4(0.5 * log(r) * r / dr, o, o2, o3);
 			}
 
-			float mandelbrot(float3 p, int iters=10, float bailout=10) {
-				float3 c, c2;
-				float r = 0;
-				float dr = 1;
-				for (int i = 0; i < iters; i++) {
-					r = length(c);
-					if (r > bailout) {
-						break;
-					}
-					c = float3((c2.x - c2.y) * (1 - c2.z / (c2.x + c2.y)), 2 * c.x * c.y * (1 - c2.z / (c2.x + c2.y)), -2 * c.z * sqrt(c2.x + c2.y));
-					dr = pow(r, 2 - 1.0) * 2 * dr + 1.0;
-					c += p;
-					c2 = c*c;
-				}
-				return .5 * log(r) * r / dr;
-			}
-
-			float sierpinski(float3 z) {
-				float3 a1 = float3(1,1,1);
-				float3 a2 = float3(-1,-1,1);
-				float3 a3 = float3(1,-1,-1);
-				float3 a4 = float3(-1,1,-1);
-				float3 c;
-				int n = 0;
-				float dist, d;
-				while (n < 10) {
-					c = a1; dist = length(z-a1);
-					d = length(z-a2); if (d < dist) { c = a2; dist=d; }
-					d = length(z-a3); if (d < dist) { c = a3; dist=d; }
-					d = length(z-a4); if (d < dist) { c = a4; dist=d; }
-					z = 2.0*z-c*(2.0-1.0);
-					n++;
-				}
-				return length(z) * pow(2.0, float(-n));
-			}
-
-			float4 sierpinski3(float3 p) {
+			float4 sierpinski(float3 p) {
 				float x = p.x; float y = p.y; float z = p.z;
 				float r = x * x + y * y + z * z;
 				float scale = _FractalScale;
@@ -340,7 +302,7 @@
 				return float4((sqrt(x*x+y*y+z*z)-1.5)*pow(3.0,-(float)iters), o, o2, o3);
 			}
 
-			float terrain(float2 x) {
+			float4 terrain(float2 x) {
 				float2 p = x*0.003/250.0;
 				float a = 0.0;
 				float b = 1.0;
@@ -354,15 +316,19 @@
 					p = float2(.8, -.6)*p*2.0;
 				}
 
-				return 250.0*120.0*a;
+				return float4(250.0*120.0*a, 1, 1, 1);
 			}
 
 
 
 			float4 sdscene(float3 p) {
-				return float4(sphere(p), 1, 1, 1);
+				//return float4(sphere(p), 1, 1, 1);
+				//return sierpinski(p);
+				for (int i = 0; i < 1; i++) {
+					boxfold(p, 10);
+				}
+				return torus(p);
 			}
-
 
 
 			ray raymarch(float3 ro, float3 rd) {
@@ -476,6 +442,12 @@
 
 			fixed4 frag(v2f i) : SV_Target{
 
+				i.uv -= .5;
+				i.uv = float2(-i.uv.x * _AspectRatio, -i.uv.y);
+
+				float3 view = float3(i.uv, 1./_FieldOfView);
+				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
+
 				light l;
 				l.range = 1000;
 				l.intensity = 1;
@@ -486,8 +458,6 @@
 				fixed3 col;
 				col.rgb = 1;
 
-				float3 view = float3(-i.uv.x*_AspectRatio+_AspectRatio*.5, -i.uv.y+.5, 1./_FieldOfView);
-				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
 
 
 				float3 forward = rotate(float3(0., 0., 1 / _FieldOfView), float3(_Rotation.yx, 0.));
@@ -502,25 +472,24 @@
 				float3 rawnormal = getnormalraw(hitpoint);
 				float3 normal = normalize(rawnormal);
 
+				//for (int i = 0; i < 1 && r.hit; i++) {
+				//	ro = hitpoint - normal * _ContactThreshold * 2;
+				//	rd = sign(sdscene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
+				//	r = raymarch(ro, rd);
+				//	dist += r.length;
+				//	hitpoint = ro + rd * r.length;
+				//	rawnormal = getnormalraw(hitpoint);
+				//	normal = normalize(rawnormal);
+				//	col = clamp(sdscene(hitpoint).yzw * .75, 0, 1);
+				//}
 
-				for (int i = 0; i < 1 && r.hit; i++) {
-					ro = hitpoint - normal * _ContactThreshold * 2;
-					rd = sign(sdscene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
-					r = raymarch(ro, rd);
-					dist += r.length;
-					hitpoint = ro + rd * r.length;
-					rawnormal = getnormalraw(hitpoint);
-					normal = normalize(rawnormal);
-					col = clamp(sdscene(hitpoint).yzw * .75, 0, 1);
-				}
+				if (r.hit) rd = reflect(rd, normal);
 
 				float3 sky = texCUBE(_Skybox, rd);
 
 				col = r.hit ?
-
-					sky
-
-					: sky;
+					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * ((1-dot(normal, rd))*.5+.5))
+				: sky;
 				//col += r.steps / 100 * _StepFactor;
 				return fixed4(col, 1);
 
