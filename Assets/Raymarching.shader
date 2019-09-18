@@ -324,10 +324,10 @@
 			float4 sdscene(float3 p) {
 				//return float4(sphere(p), 1, 1, 1);
 				//return sierpinski(p);
-				for (int i = 0; i < 1; i++) {
-					boxfold(p, 10);
-				}
-				return torus(p);
+				//for (int i = 0; i < 1; i++) {
+				//	boxfold(p, 10);
+				//}
+				return sierpinski(p);
 			}
 
 

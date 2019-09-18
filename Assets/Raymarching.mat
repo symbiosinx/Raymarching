@@ -56,7 +56,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Skybox:
-        m_Texture: {fileID: 8900000, guid: 145e2f1864775cb4b94d63b4b5135d2e, type: 3}
+        m_Texture: {fileID: 8900000, guid: 3dc595c0e66d7cd4d8e2000c8de996fb, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Floats:
@@ -101,5 +101,5 @@ Material:
     - _Color2: {r: 0.75, g: 0.5, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _LightPosition: {r: 0, g: 0, b: 0, a: 0}
-    - _Position: {r: 0.20404878, g: 0.20112301, b: 4.722979, a: 0}
-    - _Rotation: {r: -3.0686443, g: 0.32975668, b: 0, a: 0}
+    - _Position: {r: -2.8367558, g: 1.497685, b: -1.7324091, a: 0}
+    - _Rotation: {r: 7.3614235, g: 0.008827569, b: 0, a: 0}
