@@ -47,6 +47,7 @@
 			float4x4 _FrustrumCorners;
 			float4x4 _CameraInvViewMatrix;
 			sampler2D _CameraDepthTexture;
+			float3 _AmbientLight;
 
             struct appdata {
                 float2 uv : TEXCOORD0;
@@ -227,9 +228,9 @@
 				float o3 = bailout;
 				for (float i = 0; i < iters; i++) {
 					r = length(z);
-					o = min(o, length(z - float3(0, 0, 0)));
-					o2 = min(o2, length(z - float3(0, 0, .25)));
-					o3 = min(o3, length(z - float3(0, 0, 16)));
+					o = min(o, length(z - float3(1, 0, 0)));
+					o2 = min(o2, length(z - float3(0, 1, 0)));
+					o3 = min(o3, length(z - float3(0, 0, 1)));
 					if (r > bailout) break;
 
 					// convert to polar coordinates
@@ -322,7 +323,7 @@
 
 
 			float4 sdscene(float3 p) {
-				return mandelbulb(p, 2);
+				return mandelbulb(p, 7);
 			}
 
 
@@ -441,6 +442,7 @@
 				float3 view = i.viewDir;
 
 				float depth = Linear01Depth(tex2D(_CameraDepthTexture, i.uv)) * _ProjectionParams.z;
+				bool uhit = depth != _ProjectionParams.z;
 
 				light l;
 				l.range = 1000;
@@ -457,7 +459,12 @@
 				float dist = 0.0;
 
 				ray r = raymarch(ro, rd);
-				if (r.length > depth) return tex;
+
+				if ((uhit && !r.hit) || (uhit && depth < r.length)) {
+					return lerp(tex, float4(_AmbientLight, 1), raymarch(view * depth + _WorldSpaceCameraPos, _WorldSpaceLightPos0).hit);
+
+				}
+
 				dist += r.length;
 				float3 hitpoint = ro + rd * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
@@ -479,7 +486,7 @@
 				float3 sky = texCUBE(_Skybox, rd);
 
 				col = r.hit ?
-					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * clamp((1-dot(normal, rd))*.5+.5, 0, 1))/2
+					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * clamp((1-dot(normal, rd))*.5+.5, 0, 1))*.5
 				: tex;
 				col += r.steps / 100 * _StepFactor;
 
