@@ -1,9 +1,6 @@
 ﻿Shader "Custom/Raymarching" {
     Properties {
-		_AspectRatio("Aspect Ratio", Float) = 1.777778
-		_FieldOfView("Field of View", Range(.1, 20)) = 1
-		_Position("Camera Position", Vector) = (0, 1, -3, 0)
-		_Rotation("Camera Rotation", Vector) = (0, 0, 0, 0)
+		[HideInInspector] _MainTex("Main Texture", 2D) = "white" {}
 		_LightPosition("Light Position", Vector) = (0, 10, 0, 0)
 		_StepFactor("Step Factor", Range(0.05, 1)) = 1
 		_MaxSteps("Max Steps", Range(0, 2000)) = 100
@@ -12,7 +9,6 @@
 		_NormalSampleScale("Normal Sample Scale", Range(0.00001, 0.01)) = 0.01
 		_Reflections("Number of Reflections", Range(0, 10)) = 1
 		_RefractiveIndex("Refractive Index", Range(1, 2)) = 1.5
-		_Skybox("Skybox", Cube) = "black" {}
 		_Color1("Color 1", Color) = (0, 0, 0, 1)
 		_Color2("Color 2", Color) = (1, 1, 1, 1)
 		_FractalScale("Fractal Scale", Range(1.2, 2)) = 1.5
@@ -31,27 +27,7 @@
 
             #include "UnityCG.cginc"
 
-            struct appdata {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
-            };
-
-            struct v2f {
-                float2 uv : TEXCOORD0;
-                float4 vertex : SV_POSITION;
-            };
-
-            v2f vert(appdata v) {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
-                return o;
-            }
-
-			float _AspectRatio;
-			float _FieldOfView;
-			float3 _Position;
-			float2 _Rotation;
+			sampler2D _MainTex;
 			float3 _LightPosition;
 			float _StepFactor;
 			float _MaxSteps;
@@ -68,6 +44,30 @@
 			float _FractalRotationY;
 			float _FractalRotationZ;
 			float _Glossiness;
+			float4x4 _FrustrumCorners;
+			float4x4 _CameraInvViewMatrix;
+			sampler2D _CameraDepthTexture;
+
+            struct appdata {
+                float2 uv : TEXCOORD0;
+                float4 vertex : POSITION;
+            };
+
+            struct v2f {
+                float2 uv : TEXCOORD0;
+				float3 viewDir : TEXCOORD1;
+                float4 vertex : SV_POSITION;
+            };
+
+            v2f vert(appdata v) {
+                v2f o;
+                o.vertex = UnityObjectToClipPos(v.vertex);
+                o.uv = v.uv;
+				o.viewDir = _FrustrumCorners[o.uv.x+(o.uv.x ? 1-o.uv.y : (1-o.uv.y)*3)].xyz;
+				o.viewDir = mul(_CameraInvViewMatrix, o.viewDir);
+                return o;
+            }
+
 
 			struct ray {
 				bool hit;
@@ -282,7 +282,7 @@
 				return float4((sqrt(r) - 2) * pow(scale, -i), o, o2, o3); //the estimated distance
 			}
 
-			float4 menger(float3 p){//this is our old friend menger
+			float4 menger(float3 p) {
 				int n,iters=12;float t;
 				float x = p.x, y = p.y, z = p.z;
 				float o = 50; float o2 = 50; float o3 = 50;
@@ -322,12 +322,7 @@
 
 
 			float4 sdscene(float3 p) {
-				//return float4(sphere(p), 1, 1, 1);
-				//return sierpinski(p);
-				//for (int i = 0; i < 1; i++) {
-				//	boxfold(p, 10);
-				//}
-				return sierpinski(p);
+				return mandelbulb(p, 2);
 			}
 
 
@@ -442,11 +437,10 @@
 
 			fixed4 frag(v2f i) : SV_Target{
 
-				i.uv -= .5;
-				i.uv = float2(-i.uv.x * _AspectRatio, -i.uv.y);
+				float4 tex = tex2D(_MainTex, i.uv);
+				float3 view = i.viewDir;
 
-				float3 view = float3(i.uv, 1./_FieldOfView);
-				view = normalize(rotate(view, float3(_Rotation.yx, 0.)));
+				float depth = Linear01Depth(tex2D(_CameraDepthTexture, i.uv)) * _ProjectionParams.z;
 
 				light l;
 				l.range = 1000;
@@ -456,17 +450,14 @@
 				l.color = float3(.8, .7, .6);
 
 				fixed3 col;
-				col.rgb = 1;
+				col = 1;
 
-
-
-				float3 forward = rotate(float3(0., 0., 1 / _FieldOfView), float3(_Rotation.yx, 0.));
-
-				float3 ro = _Position;
+				float3 ro = _WorldSpaceCameraPos;
 				float3 rd = view;
 				float dist = 0.0;
 
 				ray r = raymarch(ro, rd);
+				if (r.length > depth) return tex;
 				dist += r.length;
 				float3 hitpoint = ro + rd * r.length;
 				float3 rawnormal = getnormalraw(hitpoint);
@@ -488,9 +479,10 @@
 				float3 sky = texCUBE(_Skybox, rd);
 
 				col = r.hit ?
-					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * ((1-dot(normal, rd))*.5+.5))
-				: sky;
-				//col += r.steps / 100 * _StepFactor;
+					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * clamp((1-dot(normal, rd))*.5+.5, 0, 1))/2
+				: tex;
+				col += r.steps / 100 * _StepFactor;
+
 				return fixed4(col, 1);
 
             }
