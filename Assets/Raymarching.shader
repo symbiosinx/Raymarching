@@ -48,6 +48,9 @@
 			float4x4 _CameraInvViewMatrix;
 			sampler2D _CameraDepthTexture;
 			float3 _AmbientLight;
+			sampler2D _CameraGBufferTexture0;
+            sampler2D _CameraGBufferTexture1;
+            sampler2D _CameraGBufferTexture2;
 
             struct appdata {
                 float2 uv : TEXCOORD0;
@@ -322,8 +325,8 @@
 
 
 
-			float4 sdscene(float3 p) {
-				return mandelbulb(p, 7);
+			float4 scene(float3 p) {
+				return mandelbulb(p, 2);
 			}
 
 
@@ -332,7 +335,7 @@
 				bool hit;
 				for (int i = 0; i < _MaxSteps; i++) {
 					float3 cp = ro + rd * dm;
-					float dts = sdscene(cp);
+					float dts = scene(cp);
 					dm += abs(dts) * _StepFactor;
 					if (abs(dts) < _ContactThreshold) {
 						hit = true;
@@ -357,27 +360,27 @@
 				// Algorithm 1
 
 				//return normalize(float3(
-				//	sdscene(p + e.xyy),
-				//	sdscene(p + e.yxy),
-				//	sdscene(p + e.yyx)
-				//) - sdscene(p));
+				//	scene(p + e.xyy),
+				//	scene(p + e.yxy),
+				//	scene(p + e.yyx)
+				//) - scene(p));
 
 				// Algorithm 2
 
 				return (float3(
-					sdscene(p + e.xyy).x - sdscene(p - e.xyy).x,
-					sdscene(p + e.yxy).x - sdscene(p - e.yxy).x,
-					sdscene(p + e.yyx).x - sdscene(p - e.yyx).x
+					scene(p + e.xyy).x - scene(p - e.xyy).x,
+					scene(p + e.yxy).x - scene(p - e.yxy).x,
+					scene(p + e.yyx).x - scene(p - e.yyx).x
 					));
 
 				// Algorithm 3
 
 				//float2 k = float2(-1., 1.);
 				//return normalize(
-				//	k.xyy*sdscene(p+k.xyy*e.x) +
-				//	k.yyx*sdscene(p+k.yyx*e.x) +
-				//	k.yxy*sdscene(p+k.yxy*e.x) +
-				//	k.xxx*sdscene(p+k.xxx*e.x)
+				//	k.xyy*scene(p+k.xyy*e.x) +
+				//	k.yyx*scene(p+k.yyx*e.x) +
+				//	k.yxy*scene(p+k.yxy*e.x) +
+				//	k.xxx*scene(p+k.xxx*e.x)
 				//);
 			}
 
@@ -442,7 +445,17 @@
 				float3 view = i.viewDir;
 
 				float depth = Linear01Depth(tex2D(_CameraDepthTexture, i.uv)) * _ProjectionParams.z;
-				bool uhit = depth != _ProjectionParams.z;
+				bool ghit = depth != _ProjectionParams.z;
+
+				float4 gbuffer0 = tex2D(_CameraGBufferTexture0, i.uv);
+                float4 gbuffer1 = tex2D(_CameraGBufferTexture1, i.uv);
+                float4 gbuffer2 = tex2D(_CameraGBufferTexture2, i.uv);
+
+                float3 gdiffuse = gbuffer0.rgb;
+                float gocclusion = gbuffer0.a;
+                float3 gspecular = gbuffer1.rgb;
+                float gsmoothness = gbuffer1.a;
+                float3 gnormal = gbuffer2.rgb;
 
 				light l;
 				l.range = 1000;
@@ -460,7 +473,8 @@
 
 				ray r = raymarch(ro, rd);
 
-				if ((uhit && !r.hit) || (uhit && depth < r.length)) {
+				if ((ghit && !r.hit) || (ghit && depth < r.length)) {
+					//if (dot(gnormal, _WorldSpaceLightPos0) < 0) return tex; 
 					return lerp(tex, float4(_AmbientLight, 1), raymarch(view * depth + _WorldSpaceCameraPos, _WorldSpaceLightPos0).hit);
 
 				}
@@ -472,13 +486,13 @@
 
 				//for (int i = 0; i < 1 && r.hit; i++) {
 				//	ro = hitpoint - normal * _ContactThreshold * 2;
-				//	rd = sign(sdscene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
+				//	rd = sign(scene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
 				//	r = raymarch(ro, rd);
 				//	dist += r.length;
 				//	hitpoint = ro + rd * r.length;
 				//	rawnormal = getnormalraw(hitpoint);
 				//	normal = normalize(rawnormal);
-				//	col = clamp(sdscene(hitpoint).yzw * .75, 0, 1);
+				//	col = clamp(scene(hitpoint).yzw * .75, 0, 1);
 				//}
 
 				if (r.hit) rd = reflect(rd, normal);
@@ -486,9 +500,9 @@
 				float3 sky = texCUBE(_Skybox, rd);
 
 				col = r.hit ?
-					lerp(sdscene(hitpoint).yzw, sky, _Glossiness * clamp((1-dot(normal, rd))*.5+.5, 0, 1))*.5
+					(dot(normal, _WorldSpaceLightPos0)*.5+.5)
 				: tex;
-				col += r.steps / 100 * _StepFactor;
+				//col += r.steps / 100 * _StepFactor;
 
 				return fixed4(col, 1);
 

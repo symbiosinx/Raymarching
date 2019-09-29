@@ -13,9 +13,11 @@ public class Raymarching : MonoBehaviour {
 	Camera cam;
 
 	void Start() {
-		mat.SetVector("_AmbientLight", RenderSettings.ambientLight);
 		cam = GetComponent<Camera>();
+		cam.renderingPath = RenderingPath.DeferredShading;
 		cam.depthTextureMode = cam.depthTextureMode | DepthTextureMode.Depth;
+		//mat.SetVector("_AmbientLight", RenderSettings.ambientLight);
+		mat.SetVector("_AmbientLight", new Vector4(0.396f, 0.478f, 0.592f, 1f));
 		//mat.SetTexture("_Skybox", RenderSettings.customReflection);
 		mat.SetTexture("_Skybox", reflectionProbe.bakedTexture);
 	}
