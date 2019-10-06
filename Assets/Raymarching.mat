@@ -63,23 +63,23 @@ Material:
     - _AspectRatio: 1.7777778
     - _BentNormalSampleScale: 0.0287
     - _BumpScale: 1
-    - _ContactThreshold: 0.01
+    - _ContactThreshold: 0.002
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _FieldOfView: 1.5
-    - _FractalRotationX: 0.25
-    - _FractalRotationY: -0.2
-    - _FractalRotationZ: 0
-    - _FractalScale: 1.5
+    - _FractalRotationX: 0.32
+    - _FractalRotationY: -0.13
+    - _FractalRotationZ: -0.16
+    - _FractalScale: 1.61
     - _GlossMapScale: 1
     - _Glossiness: 0.2
     - _GlossyReflections: 1
     - _MaxDist: 50
-    - _MaxSteps: 100
+    - _MaxSteps: 400
     - _Metallic: 0
     - _Mode: 0
-    - _NormalSampleScale: 0.01
+    - _NormalSampleScale: 0.0001
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _Reflections: 3.12
@@ -90,7 +90,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _StepFactor: 0.75
+    - _StepFactor: 0.2
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:

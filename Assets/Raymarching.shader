@@ -47,10 +47,6 @@
 			float4x4 _FrustrumCorners;
 			float4x4 _CameraInvViewMatrix;
 			sampler2D _CameraDepthTexture;
-			float3 _AmbientLight;
-			sampler2D _CameraGBufferTexture0;
-            sampler2D _CameraGBufferTexture1;
-            sampler2D _CameraGBufferTexture2;
 
             struct appdata {
                 float2 uv : TEXCOORD0;
@@ -204,26 +200,27 @@
 
 
 			float4 sphere(float3 p, float r=1.0) {
-				return float4(length(p) - r*.5, 1, 1, 1);
+				return float4(1, 1, 1, length(p) - r*.5);
 			}
 
 			float4 box(float3 p, float3 b = float3(1.0, 1.0, 1.0)) {
 				float3 d = abs(p) - b;
-				return float4(length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0), 1, 1, 1);
+				return float4(1, 1, 1, length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0));
 			}
 
 			float4 torus(float3 p, float2 t=float2(1, .5)) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
-				return float4(length(q) - t.y, 1, 1, 1);
+				return float4(1, 1, 1, length(q) - t.y);
 			}
 
 			float4 cylinder(float3 p, float h=1, float r=1) {
 				float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
-				return float4(min(max(d.x,d.y),0.0) + length(max(d,0.0)), 1, 1, 1);
+				return float4(1, 1, 1, min(max(d.x,d.y),0.0) + length(max(d,0.0)));
 			}
 
-			float4 mandelbulb(float3 p, float e=8, float iters=12, float bailout=10) {
+			float4 mandelbulb(float3 p, float e=7, float iters=12, float bailout=10) {
 				float3 z = p;
+				float c = p;
 				float dr = 1.0;
 				float r = 0.0;
 				float o = bailout;
@@ -231,9 +228,10 @@
 				float o3 = bailout;
 				for (float i = 0; i < iters; i++) {
 					r = length(z);
-					o = min(o, length(z - float3(1, 0, 0)));
-					o2 = min(o2, length(z - float3(0, 1, 0)));
-					o3 = min(o3, length(z - float3(0, 0, 1)));
+					o = min(o, length(z - float3(0, 0, 0)));
+					o2 = min(o2, length(z - float3(0, 0, 1)));
+					//o2 = max(o2, length(z - float3(0, 0, 0)));
+					o3 = min(o3, length(z - float3(0, 0, 2)));
 					if (r > bailout) break;
 
 					// convert to polar coordinates
@@ -249,10 +247,10 @@
 
 					// convert back to cartesian coordinates
 					z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
-					z += p;
+					z += rotate(float3(.5, .5, 1), float3(_Time.y, _Time.y*1.414, _Time.y*1.618));
 
 				}
-				return float4(0.5 * log(r) * r / dr, o, o2, o3);
+				return float4(o, o2, o3, 0.5 * log(r) * r / dr);
 			}
 
 			float4 sierpinski(float3 p) {
@@ -283,7 +281,7 @@
 					o2 = min(o2, length(float3(x, y, z) - float3(0, 1, 0)));
 					o3 = min(o3, length(float3(x, y, z) - float3(0, 0, 1)));
 				}
-				return float4((sqrt(r) - 2) * pow(scale, -i), o, o2, o3); //the estimated distance
+				return float4(o, o2, o3, (sqrt(r) - 2) * pow(scale, -i)); //the estimated distance
 			}
 
 			float4 menger(float3 p) {
@@ -303,7 +301,7 @@
 					o2 = min(o2, length(float3(x, y, z) - float3(0, .5, 0)));
 					o3 = min(o3, length(float3(x, y, z) - float3(0, 0, .5)));
 				}
-				return float4((sqrt(x*x+y*y+z*z)-1.5)*pow(3.0,-(float)iters), o, o2, o3);
+				return float4(o, o2, o3, (sqrt(x*x+y*y+z*z)-1.5)*pow(3.0,-(float)iters));
 			}
 
 			float4 terrain(float2 x) {
@@ -320,28 +318,34 @@
 					p = float2(.8, -.6)*p*2.0;
 				}
 
-				return float4(250.0*120.0*a, 1, 1, 1);
+				return float4(1, 1, 1, 250.0*120.0*a);
 			}
 
 
 
 			float4 scene(float3 p) {
-				return mandelbulb(p, 2);
+				//_FractalRotationX = sin(_Time.y)*.5;
+				//_FractalRotationY = sin(_Time.y*1.414)*.5;
+				//_FractalRotationZ = sin(_Time.y*1.618)*.5;
+				//return mandelbulb(rotate(p, float3(0, 0, _Time.y)), menger(rotate(p, float3(_Time.y*.25, _Time.y*1.4*.25, _Time.y*1.6*.25))).w+1.1);
+				return mandelbulb(p);
 			}
 
 
-			ray raymarch(float3 ro, float3 rd) {
+			ray raymarch(float3 ro, float3 rd, float depth=2000) {
+				depth = min(depth, _MaxDist);
 				float dm = 0;
 				bool hit;
 				for (int i = 0; i < _MaxSteps; i++) {
 					float3 cp = ro + rd * dm;
-					float dts = scene(cp);
+					float dts = scene(cp).w;
 					dm += abs(dts) * _StepFactor;
+					_ContactThreshold = dm*.0025;
 					if (abs(dts) < _ContactThreshold) {
 						hit = true;
 						break;
 					}
-					if (dm > _MaxDist) {
+					if (dm > depth) {
 						break;
 					}
 				}
@@ -368,9 +372,9 @@
 				// Algorithm 2
 
 				return (float3(
-					scene(p + e.xyy).x - scene(p - e.xyy).x,
-					scene(p + e.yxy).x - scene(p - e.yxy).x,
-					scene(p + e.yyx).x - scene(p - e.yyx).x
+					scene(p + e.xyy).w - scene(p - e.xyy).w,
+					scene(p + e.yxy).w - scene(p - e.yxy).w,
+					scene(p + e.yyx).w - scene(p - e.yyx).w
 					));
 
 				// Algorithm 3
@@ -439,23 +443,13 @@
 				return o;
 			}
 
-			fixed4 frag(v2f i) : SV_Target{
+			fixed4 frag(v2f i) : SV_Target {
 
 				float4 tex = tex2D(_MainTex, i.uv);
 				float3 view = i.viewDir;
 
 				float depth = Linear01Depth(tex2D(_CameraDepthTexture, i.uv)) * _ProjectionParams.z;
 				bool ghit = depth != _ProjectionParams.z;
-
-				float4 gbuffer0 = tex2D(_CameraGBufferTexture0, i.uv);
-                float4 gbuffer1 = tex2D(_CameraGBufferTexture1, i.uv);
-                float4 gbuffer2 = tex2D(_CameraGBufferTexture2, i.uv);
-
-                float3 gdiffuse = gbuffer0.rgb;
-                float gocclusion = gbuffer0.a;
-                float3 gspecular = gbuffer1.rgb;
-                float gsmoothness = gbuffer1.a;
-                float3 gnormal = gbuffer2.rgb;
 
 				light l;
 				l.range = 1000;
@@ -471,13 +465,7 @@
 				float3 rd = view;
 				float dist = 0.0;
 
-				ray r = raymarch(ro, rd);
-
-				if ((ghit && !r.hit) || (ghit && depth < r.length)) {
-					//if (dot(gnormal, _WorldSpaceLightPos0) < 0) return tex; 
-					return lerp(tex, float4(_AmbientLight, 1), raymarch(view * depth + _WorldSpaceCameraPos, _WorldSpaceLightPos0).hit);
-
-				}
+				ray r = raymarch(ro, rd, depth);
 
 				dist += r.length;
 				float3 hitpoint = ro + rd * r.length;
@@ -486,21 +474,24 @@
 
 				//for (int i = 0; i < 1 && r.hit; i++) {
 				//	ro = hitpoint - normal * _ContactThreshold * 2;
-				//	rd = sign(scene(hitpoint).x >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
+				//	rd = sign(scene(hitpoint).w >= 0) ? refract(rd, normal, 1.1) : reflect(rd, normal);
 				//	r = raymarch(ro, rd);
 				//	dist += r.length;
 				//	hitpoint = ro + rd * r.length;
 				//	rawnormal = getnormalraw(hitpoint);
 				//	normal = normalize(rawnormal);
-				//	col = clamp(scene(hitpoint).yzw * .75, 0, 1);
+				//	col = clamp(scene(hitpoint).rgb * .75, 0, 1);
 				//}
 
 				if (r.hit) rd = reflect(rd, normal);
 
 				float3 sky = texCUBE(_Skybox, rd);
 
+				float3 srgb = scene(hitpoint).rgb;
+
 				col = r.hit ?
-					(dot(normal, _WorldSpaceLightPos0)*.5+.5)
+					//clamp(scene(hitpoint).r*2.5-1.75, 0, 1)
+					srgb * remap(dot(normal, _WorldSpaceLightPos0), -1, 1, .25, 1) * getAO(rawnormal)
 				: tex;
 				//col += r.steps / 100 * _StepFactor;
 
