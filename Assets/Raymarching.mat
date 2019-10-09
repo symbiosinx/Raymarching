@@ -68,10 +68,10 @@ Material:
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _FieldOfView: 1.5
-    - _FractalRotationX: 0.32
-    - _FractalRotationY: -0.13
-    - _FractalRotationZ: -0.16
-    - _FractalScale: 1.61
+    - _FractalRotationX: 0.19
+    - _FractalRotationY: -0.26
+    - _FractalRotationZ: 0.14
+    - _FractalScale: 2
     - _GlossMapScale: 1
     - _Glossiness: 0.2
     - _GlossyReflections: 1
@@ -79,7 +79,7 @@ Material:
     - _MaxSteps: 400
     - _Metallic: 0
     - _Mode: 0
-    - _NormalSampleScale: 0.0001
+    - _NormalSampleScale: 0.00005
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _Reflections: 3.12
@@ -90,7 +90,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _StepFactor: 0.2
+    - _StepFactor: 0.25
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:

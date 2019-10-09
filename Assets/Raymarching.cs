@@ -9,17 +9,24 @@ public class Raymarching : MonoBehaviour {
 
 	public Material mat;
 	public ReflectionProbe reflectionProbe;
+	public Transform[] transforms;
 
 	Camera cam;
+	float speed = 1f;
 
 	void Start() {
 		cam = GetComponent<Camera>();
 		//cam.renderingPath = RenderingPath.DeferredShading;
-		cam.depthTextureMode = cam.depthTextureMode | DepthTextureMode.Depth;
+		cam.depthTextureMode = DepthTextureMode.Depth;
 		//mat.SetVector("_AmbientLight", RenderSettings.ambientLight);
 		//mat.SetVector("_AmbientLight", new Vector4(0.396f, 0.478f, 0.592f, 1f));
 		//mat.SetTexture("_Skybox", RenderSettings.customReflection);
 		//mat.SetTexture("_Skybox", reflectionProbe.bakedTexture);
+	}
+	
+	void Update() {
+		
+		transform.position += transform.TransformDirection(new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical")) * Time.deltaTime * speed);
 	}
 
 	Matrix4x4 GetFrustumCorners() {
@@ -48,9 +55,39 @@ public class Raymarching : MonoBehaviour {
     	return frustumCorners;
 	}
 
+	Matrix4x4 GetPositions() {
+		Matrix4x4 positions = Matrix4x4.identity;
+		for (int i = 0; i < Mathf.Min(4, transforms.Length); i++) {
+			if (transforms[i]) positions.SetRow(i, transforms[i].position);
+		}
+		return positions;
+
+	}
+
+	Matrix4x4 GetRotations() {
+		Matrix4x4 rotations = Matrix4x4.identity;
+		for (int i = 0; i < Mathf.Min(4, transforms.Length); i++) {
+			Quaternion rot = transforms[i].rotation;
+			if (transforms[i]) rotations.SetRow(i, new Vector4(rot.x, rot.y, rot.z, rot.w));
+		}
+		return rotations;
+	}
+
+	Matrix4x4 GetScales() {
+		Matrix4x4 scales = Matrix4x4.identity;
+		for (int i = 0; i < Mathf.Min(4, transforms.Length); i++) {
+			if (transforms[i]) scales.SetRow(i, transforms[i].lossyScale);
+		}
+		return scales;
+
+	}
+
 	void OnRenderImage(RenderTexture src, RenderTexture dest) {
 		mat.SetMatrix("_FrustrumCorners", GetFrustumCorners());
 		mat.SetMatrix("_CameraInvViewMatrix", cam.cameraToWorldMatrix);
+		mat.SetMatrix("_Positions", GetPositions());
+		mat.SetMatrix("_Rotations", GetRotations());
+		mat.SetMatrix("_Scales", GetScales());
 		Graphics.Blit(src, dest, mat);
 	}
 }

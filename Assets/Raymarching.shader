@@ -18,15 +18,15 @@
 		_Glossiness("Glossiness", Range(0, 1)) = 0
     }
     SubShader {
-        Cull Off ZWrite On ZTest LEqual
+        Cull Off ZWrite On ZTest Always
 
-        Pass {
-            CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-
-            #include "UnityCG.cginc"
-
+		Pass {
+			CGPROGRAM
+			#pragma vertex vert
+			#pragma fragment frag
+			#include "UnityCG.cginc"
+			#include "AutoLight.cginc"
+			
 			sampler2D _MainTex;
 			float3 _LightPosition;
 			float _StepFactor;
@@ -46,28 +46,11 @@
 			float _Glossiness;
 			float4x4 _FrustrumCorners;
 			float4x4 _CameraInvViewMatrix;
+			float4x4 _Positions;
+			float4x4 _Rotations;
+			float4x4 _Scales;
 			sampler2D _CameraDepthTexture;
-
-            struct appdata {
-                float2 uv : TEXCOORD0;
-                float4 vertex : POSITION;
-            };
-
-            struct v2f {
-                float2 uv : TEXCOORD0;
-				float3 viewDir : TEXCOORD1;
-                float4 vertex : SV_POSITION;
-            };
-
-            v2f vert(appdata v) {
-                v2f o;
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = v.uv;
-				o.viewDir = _FrustrumCorners[o.uv.x+(o.uv.x ? 1-o.uv.y : (1-o.uv.y)*3)].xyz;
-				o.viewDir = mul(_CameraInvViewMatrix, o.viewDir);
-                return o;
-            }
-
+			sampler2D _ShadowMapTexture;
 
 			struct ray {
 				bool hit;
@@ -85,16 +68,8 @@
 			};
 
 
-			float4 qmul(float4 v, float4 q) {
-				return float4(
-					v.x*q.x - v.y*q.y - v.z*q.z - v.w * q.w,
-					v.x*q.y + v.y*q.x - v.z*q.w + v.w * q.z,
-					v.x*q.z + v.y*q.w + v.z*q.x - v.w * q.y,
-					v.x*q.w - v.y*q.z + v.z*q.y + v.w * q.x
-				);
-			}
-
 			float3 rotate(float3 v, float3 a) {
+
 				float3 c = cos(a);
 				float3 s = sin(a);
 				float3x3 mx = float3x3(1, 0, 0, 0, c.x, -s.x, 0, s.x, c.x);
@@ -102,19 +77,12 @@
 				float3x3 mz = float3x3(c.z, -s.z, 0, s.z, c.z, 0, 0, 0, 1);
 				return mul(mz, mul(my, mul(mx, v)));
 
-				//float cy = cos(a.x * 0.5);
-				//float sy = sin(a.x * 0.5);
-				//float cp = cos(a.y * 0.5);
-				//float sp = sin(a.y * 0.5);
-				//float cr = cos(a.z * 0.5);
-				//float sr = sin(a.z * 0.5);
-				//float4 q = float4(
-				//	cy * cp * cr + sy * sp * sr,
-				//	cy * cp * sr - sy * sp * cr,
-				//	sy * cp * sr + cy * sp * cr,
-				//	sy * cp * cr - cy * sp * sr
-				//);
-				//return qmul(qmul(float4(v, 0), q), float4(q.x, -q.y, -q.z, -q.w)).xyz;
+			}
+
+			float3 rotate(float3 v, float4 q) {
+
+				float3 u = -q.xyz;
+				return 2 * dot(u, v) * u + (q.w*q.w - dot(u, u)) * v + 2 * q.w * cross(u, v);
 			}
 
 			float sq(float x) {
@@ -146,13 +114,28 @@
 				return mod(x + m * .5, m) - m * .5;
 			}
 
+			float3 blend(float3 c1, float3 c2, float k) {
+				return normalize(lerp(c1, c2, k))*lerp(length(c1), length(c2), k);
+			}
+
 			float smin(float a, float b, float k = .5) {
-				float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return lerp(b, a, h) - k * h * (1.0 - h);
+				float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+				return lerp(b, a, h) - k * h * (1.0 - h);
+			}
+
+			float4 smin(float4 a, float4 b, float k = .5) {
+				float h = clamp(0.5 + 0.5 * (b.w - a.w) / k, 0.0, 1.0);
+				return float4(blend(b.rgb, a.rgb, h), lerp(b.w, a.w, h) - k * h * (1.0 - h));
 			}
 
 			float smax(float a, float b, float k = .5) {
-				// Temporary code
-				return -smin(-a, -b, k);
+				float h = clamp(0.5 + 0.5 * (a - b) / k, 0.0, 1.0);
+				return lerp(-b, -a, h) - k * h * (1.0 - h);
+			}
+
+			float4 smax(float4 a, float4 b, float k = .5) {
+				float h = clamp(0.5 + 0.5 * (a.w - b.w) / k, 0.0, 1.0);
+				return float4(lerp(b.rgb, a.rgb, h), -lerp(-b.w, -a.w, h) - k * h * (1.0 - h));
 			}
 
 			float rand(float2 co){
@@ -204,16 +187,17 @@
 			}
 
 			float4 box(float3 p, float3 b = float3(1.0, 1.0, 1.0)) {
+				b *= .5;
 				float3 d = abs(p) - b;
 				return float4(1, 1, 1, length(max(d, 0.0)) + min(max(d.x, max(d.y, d.z)), 0.0));
 			}
 
-			float4 torus(float3 p, float2 t=float2(1, .5)) {
+			float4 torus(float3 p, float2 t=float2(.5, .25)) {
 				float2 q = float2(length(p.xy) - t.x, p.z);
 				return float4(1, 1, 1, length(q) - t.y);
 			}
 
-			float4 cylinder(float3 p, float h=1, float r=1) {
+			float4 cylinder(float3 p, float h=.5, float r=.5) {
 				float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
 				return float4(1, 1, 1, min(max(d.x,d.y),0.0) + length(max(d,0.0)));
 			}
@@ -247,7 +231,42 @@
 
 					// convert back to cartesian coordinates
 					z = zr * float3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta));
-					z += rotate(float3(.5, .5, 1), float3(_Time.y, _Time.y*1.414, _Time.y*1.618));
+					z += p;
+
+				}
+				return float4(o, o2, o3, .5 * log(r) * r / dr);
+			}
+
+			float4 mandelbrot(float3 p, float e=2, float iters=12, float bailout=10) {
+				float3 z = p;
+				float c = p;
+				float dr = 1.0;
+				float r = 0.0;
+				float o = bailout;
+				float o2 = bailout;
+				float o3 = bailout;
+				for (float i = 0; i < iters; i++) {
+					o = min(o, length(z - float3(0, 0, 0)));
+					o2 = min(o2, length(z - float3(1, 0, 0)));
+					o3 = min(o3, length(z - float3(2, 0, 0)));
+
+					r = length(z);
+					if (r > bailout) break;
+
+					// convert to polar coordinates
+					float theta = atan2(z.y, z.x);
+					float phi = asin(z.z / r);
+					dr = pow(r, e - 1.0) * e * dr + 1.0;
+
+					// scale and rotate the point
+					float zr = pow(r, e);
+					theta = theta * e;
+					phi = phi * e;
+
+
+					// convert back to cartesian coordinates
+					z = zr * float3(cos(theta) * cos(phi), sin(theta) * cos(phi), -sin(phi));
+					z += p;
 
 				}
 				return float4(o, o2, o3, 0.5 * log(r) * r / dr);
@@ -324,19 +343,43 @@
 
 
 			float4 scene(float3 p) {
+
+				float3 p0 = (p-_Positions[0].xyz)/_Scales[0].xyz;
+				float3 p1 = (p-_Positions[1].xyz)/_Scales[1].xyz;
+				float3 p2 = (p-_Positions[2].xyz)/_Scales[2].xyz;
+				float3 p3 = (p-_Positions[3].xyz);
+
+				p0 = rotate(p0, _Rotations[0]);
+				p1 = rotate(p1, _Rotations[1]);
+				p2 = rotate(p2, _Rotations[2]);
+				p3 = rotate(p3, _Rotations[3]);
+
 				//_FractalRotationX = sin(_Time.y)*.5;
 				//_FractalRotationY = sin(_Time.y*1.414)*.5;
 				//_FractalRotationZ = sin(_Time.y*1.618)*.5;
 				//return mandelbulb(rotate(p, float3(0, 0, _Time.y)), menger(rotate(p, float3(_Time.y*.25, _Time.y*1.4*.25, _Time.y*1.6*.25))).w+1.1);
-				return mandelbulb(p);
+
+				float4 o0 = torus(rotate(p0, float3(p0.y*5, 0, 0)));
+				float4 o1 = torus(rotate(p1, float3(0, p1.y*2, 0)));
+				float4 o2 = torus(rotate(p2, float3(p2.z*2, p2.z, 0)));
+				float4 o3 = box(p3, _Scales[3].xyz);
+
+				o0.rgb = float3(1, .25, .25);
+				o1.rgb = float3(.25, 1, .25);
+				o2.rgb = float3(.25, .25, 1);
+
+				float blend = 1;
+
+				return smin(smin(smin(o0, o1, blend), o2, blend), o3, blend);
 			}
 
 
-			ray raymarch(float3 ro, float3 rd, float depth=2000) {
+			ray raymarch(float3 ro, float3 rd, float depth=2000, float steps=2000) {
 				depth = min(depth, _MaxDist);
+				steps = min(steps, _MaxSteps);
 				float dm = 0;
 				bool hit;
-				for (int i = 0; i < _MaxSteps; i++) {
+				for (int i = 0; i < steps; i++) {
 					float3 cp = ro + rd * dm;
 					float dts = scene(cp).w;
 					dm += abs(dts) * _StepFactor;
@@ -410,13 +453,26 @@
 				return lerp(d * l.intensity, 0.0, dist / l.range);
 			}
 
-			float getshadow(float3 p, float3 n) {
-				float3 l = normalize(_LightPosition - p);
-				float d = raymarch(p + n * _ContactThreshold * 2, l).length;
-				if (d < length(_LightPosition - p)) {
-					return 0;
+			float getshadow(float3 p, float3 n, float k=16, float depth=2000, float steps=2000) {
+				depth = min(depth, _MaxDist);
+				steps = min(steps, _MaxSteps);
+				float dm = 0;
+				float res = 1;
+				for (int i = 0; i < steps; i++) {
+					float3 cp = p + _WorldSpaceLightPos0 * dm;
+					float dts = scene(cp).w;
+					res = min(res, k*dts/dm);
+					dm += abs(dts) * _StepFactor;
+					_ContactThreshold = dm*.0025;
+					if (abs(dts) < _ContactThreshold) {
+						break;
+					}
+					if (dm > depth) {
+						break;
+					}
 				}
-				return 1;
+
+				return res;
 			}
 
 			float getAO(float3 n) {
@@ -443,7 +499,34 @@
 				return o;
 			}
 
+			struct appdata {
+				float2 uv : TEXCOORD0;
+				float4 vertex : POSITION;
+			};
+
+			struct v2f {
+				float2 uv : TEXCOORD0;
+				float3 viewDir : TEXCOORD1;
+				float4 vertex : SV_POSITION;
+			};
+
+			v2f vert(appdata v) {
+				v2f o;
+				o.vertex = UnityObjectToClipPos(v.vertex);
+				o.uv = v.uv;
+				o.viewDir = _FrustrumCorners[o.uv.x+(o.uv.x ? 1-o.uv.y : (1-o.uv.y)*3)].xyz;
+				o.viewDir = mul(_CameraInvViewMatrix, o.viewDir);
+				return o;
+			}
+
 			fixed4 frag(v2f i) : SV_Target {
+
+				//return UNITY_SAMPLE_SHADOW(i.uv)
+
+				UNITY_DECLARE_SHADOWMAP(_CascadeShadowMapTexture);
+
+				return UNITY_SAMPLE_SHADOW(_CascadeShadowMapTexture, i.viewDir);
+			
 
 				float4 tex = tex2D(_MainTex, i.uv);
 				float3 view = i.viewDir;
@@ -489,16 +572,56 @@
 
 				float3 srgb = scene(hitpoint).rgb;
 
+				float shadow = remap(getshadow(hitpoint, normal), 0, 1, .25, 1);
+
 				col = r.hit ?
 					//clamp(scene(hitpoint).r*2.5-1.75, 0, 1)
-					srgb * remap(dot(normal, _WorldSpaceLightPos0), -1, 1, .25, 1) * getAO(rawnormal)
-				: tex;
+					srgb * (dot(normal, _WorldSpaceLightPos0)*.5+.5) * shadow * getAO(rawnormal)
+					//normal*.5+.5
+				: tex;	
 				//col += r.steps / 100 * _StepFactor;
 
 				return fixed4(col, 1);
 
-            }
-            ENDCG
-        }
+			}
+			ENDCG
+		}
+
+		GrabPass {
+			"_ScreenTexture"
+		}
+
+		Pass {
+			CGPROGRAM
+			#pragma vertex vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
+			
+			sampler2D _CameraDepthTexture;
+			sampler2D _ScreenTexture;
+
+			struct appdata {
+				float2 uv : TEXCOORD0;
+				float4 vertex : POSITION;
+			};
+
+			struct v2f {
+				float2 uv : TEXCOORD0;
+				float4 vertex : SV_POSITION;
+			};
+
+			v2f vert(appdata v) {
+				v2f o;
+				o.vertex = UnityObjectToClipPos(v.vertex);
+				o.uv = v.uv;
+				return o;
+			}
+
+			fixed4 frag(v2f i) : SV_Target {
+				float4 tex = tex2D(_ScreenTexture, i.uv);
+				return tex;
+			}
+			ENDCG
+		}
     }
 }
