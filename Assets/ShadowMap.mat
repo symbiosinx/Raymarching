@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Raymarching
-  m_Shader: {fileID: 4800000, guid: 91e810dd36b9d304a8ba04b53c41cfd7, type: 3}
+  m_Name: ShadowMap
+  m_Shader: {fileID: 4800000, guid: 4b5daaa81eb2c2248a51ddb0577620dd, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -55,51 +55,23 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _Skybox:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     m_Floats:
-    - _AspectRatio: 1.7777778
-    - _BentNormalSampleScale: 0.0287
     - _BumpScale: 1
-    - _ContactThreshold: 0.002
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _FieldOfView: 1.5
-    - _FractalRotationX: 0.19
-    - _FractalRotationY: -0.26
-    - _FractalRotationZ: 0.14
-    - _FractalScale: 2
     - _GlossMapScale: 1
-    - _Glossiness: 0.2
+    - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _MaxDist: 50
-    - _MaxSteps: 400
     - _Metallic: 0
     - _Mode: 0
-    - _NormalSampleScale: 0.00005
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _Reflections: 3.12
-    - _RefractiveIndex: 1
-    - _SDScene: 0
-    - _Size: 1
-    - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _StepFactor: 0.7
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _AspectRatio: {r: 1, g: 1, b: 0, a: 0}
-    - _CameraRotation: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _Color1: {r: 1, g: 1, b: 1, a: 1}
-    - _Color2: {r: 0.75, g: 0.5, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _LightPosition: {r: 0, g: 0, b: 0, a: 0}
-    - _Position: {r: 0, g: 1, b: -3, a: 0}
-    - _Rotation: {r: 0, g: -0, b: 0, a: 0}

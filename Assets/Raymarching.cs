@@ -6,6 +6,7 @@ using UnityEngine;
 [ImageEffectAllowedInSceneView]
 public class Raymarching : MonoBehaviour {
 
+	//public ShadowMap shadowMap;
 
 	public Material mat;
 	public ReflectionProbe reflectionProbe;
@@ -25,7 +26,6 @@ public class Raymarching : MonoBehaviour {
 	}
 	
 	void Update() {
-		
 		transform.position += transform.TransformDirection(new Vector3(Input.GetAxis("Horizontal"), 0f, Input.GetAxis("Vertical")) * Time.deltaTime * speed);
 	}
 
@@ -88,6 +88,9 @@ public class Raymarching : MonoBehaviour {
 		mat.SetMatrix("_Positions", GetPositions());
 		mat.SetMatrix("_Rotations", GetRotations());
 		mat.SetMatrix("_Scales", GetScales());
+		//shadowMap.Render();
+		//mat.SetTexture("_ShadowMap", shadowMap.shadowMap);
+		//mat.SetMatrix("_ShadowMapVPMatrix", shadowMap.cam.worldToCameraMatrix * shadowMap.cam.projectionMatrix);
 		Graphics.Blit(src, dest, mat);
 	}
 }
