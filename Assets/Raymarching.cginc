@@ -181,6 +181,11 @@ float4 torus(float3 p, float2 t=float2(.5, .25)) {
 	return float4(1, 1, 1, length(q) - t.y);
 }
 
+float4 link(float3 p, float le, float r1, float r2) {
+    float3 q = float3(p.x, max(abs(p.y)-le,0.0), p.z);
+    return length(float2(length(q.xy)-r1,q.z)) - r2;
+}
+
 float4 cylinder(float3 p, float h=.5, float r=.5) {
 	float2 d = abs(float2(length(p.xz),p.y)) - float2(h,r);
 	return float4(1, 1, 1, min(max(d.x,d.y),0.0) + length(max(d,0.0)));
@@ -345,7 +350,7 @@ float4 scene(float3 p) {
 
 	float4 o0 = sphere(p0 / _Scales[0].xyz) * min(_Scales[0].xyz);
 	float4 o1 = box(p1 / _Scales[1].xyz) * min(_Scales[1].xyz);
-	float4 o2 = torus(p2 / _Scales[2].xyz) * min(_Scales[2].xyz);
+	float4 o2 = link(p2 / _Scales[2].xyz, 5, 5, .1) * min(_Scales[2].xyz);
 	float4 o3 = cylinder(p3 / _Scales[3].xyz) * min(_Scales[3].xyz);
 
 	o0.rgb = float3(1, .25, .25);
