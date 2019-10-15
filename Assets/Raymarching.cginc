@@ -73,6 +73,10 @@ float3 sq(float3 x) {
 	return x*x;
 }
 
+float min(float3 x) {
+	return min(x.x, min(x.y, x.z));
+}
+
 float remap(float x, float o1, float o2, float n1, float n2) {
 	return (x - o1) / (o2 - o1) * (n2 - n1) + n1;
 }
@@ -339,18 +343,19 @@ float4 scene(float3 p) {
 	//_FractalRotationZ = sin(_Time.y*1.618)*.5;
 	//return mandelbulb(rotate(p, float3(0, 0, _Time.y)), menger(rotate(p, float3(_Time.y*.25, _Time.y*1.4*.25, _Time.y*1.6*.25))).w+1.1);
 
-	float4 o0 = box(p0, _Scales[0].xyz);
-	float4 o1 = box(p1, _Scales[1].xyz);
-	float4 o2 = box(p2, _Scales[2].xyz);
-	float4 o3 = box(p3, _Scales[3].xyz);
+	float4 o0 = sphere(p0 / _Scales[0].xyz) * min(_Scales[0].xyz);
+	float4 o1 = box(p1 / _Scales[1].xyz) * min(_Scales[1].xyz);
+	float4 o2 = torus(p2 / _Scales[2].xyz) * min(_Scales[2].xyz);
+	float4 o3 = cylinder(p3 / _Scales[3].xyz) * min(_Scales[3].xyz);
 
 	o0.rgb = float3(1, .25, .25);
 	o1.rgb = float3(.25, 1, .25);
 	o2.rgb = float3(.25, .25, 1);
+	o3.rgb = float3(1, 1, .25);
 
 	float blend = 1;
 
-	return min(max(max(-o0, o1), -o2), o3);
+	return smin(smin(o0, o1), smin(o2, o3));
 }
 
 

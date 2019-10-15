@@ -203,13 +203,13 @@
 				//col += r.steps / 100 * _StepFactor;
 
 
-				// float la = 0;
-				// for (float i = 0; i*.5 < min(5, r.length); i++) {
-				// 	float3 rp = ro+rd*i*.5;
-				// 	la += getshadow(rp, 0)*.1;
-				// }
-
-				// col.rgb += la;
+				//float la = 0;
+				//for (float i = 0; i*.1 < min(5, r.length); i++) {
+				//	float3 rp = ro+rd*i*.1;
+				//	la += getshadow(rp, 0)*.05;
+				//}
+				//
+				//col.rgb += la;
 
 				return fixed4(col, 1);
 
